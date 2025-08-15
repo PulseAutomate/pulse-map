@@ -1,0 +1,9 @@
+[
+  {
+    "entity_id": "light.living_room",
+    "state": "on",
+    "attributes": { "brightness": 180, "friendly_name": "Living Room" },
+    "last_changed": "2025-08-14T19:00:00+00:00",
+    "last_updated": "2025-08-14T19:00:00+00:00"
+  }
+]

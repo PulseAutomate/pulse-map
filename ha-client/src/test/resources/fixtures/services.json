@@ -1,0 +1,14 @@
+[
+  {
+    "domain": "light",
+    "services": {
+      "turn_on": {
+        "name": "Turn on",
+        "description": "Turn on the light",
+        "fields": {
+          "brightness_pct": { "required": false, "description": "0..100" }
+        }
+      }
+    }
+  }
+]
