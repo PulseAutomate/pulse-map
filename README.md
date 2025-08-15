@@ -1,7 +1,7 @@
 # Pulse Map
 
 [![Build](https://img.shields.io/github/actions/workflow/status/PulseAutomate/pulse-map/ci.yml?label=CI)](https://github.com/PulseAutomate/pulse-map/actions)
-[![Release](https://img.shields.io/github/v/release/PulseAutomate/pulse-map?display_name=tag\&sort=semver)](https://github.com/PulseAutomate/pulse-map/releases)
+[![Release](https://img.shields.io/github/v/release/PulseAutomate/pulse-map?sort=semver)](https://github.com/PulseAutomate/pulse-map/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](#license)
 ![Java](https://img.shields.io/badge/Java-21%2B-informational)
 ![GraalVM](https://img.shields.io/badge/GraalVM-native--image-informational)
