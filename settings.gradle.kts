@@ -1,0 +1,11 @@
+rootProject.name = "pulse-map"
+include("app-cli")
+include("mapd")
+include("ha-client")
+include("manifest")
+include("gen-proto")
+include("gen-jvm")
+include("gen-attrs")
+include("grpc-api")
+include("test-fixtures")
+include("integration-tests")

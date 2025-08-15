@@ -1,0 +1,47 @@
+# gradle/libs.versions.toml
+
+[versions]
+junit = "5.10.2"
+picocli = "4.7.6"
+jackson = "2.17.1"
+javapoet = "1.13.0"
+protobuf = "3.25.3"
+grpc = "1.62.2"
+
+# Plugins
+spotless = "6.25.0"
+protobuf-plugin = "0.9.4"
+graalvm-native = "0.10.3"
+versions-plugin = "0.51.0"
+
+[libraries]
+# CLI
+picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
+picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
+
+# Testing
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+
+# JSON serde
+jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "jackson" }
+
+# Codegen
+javapoet = { module = "com.squareup:javapoet", version.ref = "javapoet" }
+
+# Protobuf & gRPC (for later milestones)
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
+grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
+grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "grpc" }
+
+[bundles]
+jackson = ["jackson-core", "jackson-databind", "jackson-annotations"]
+grpc = ["grpc-stub", "grpc-protobuf", "grpc-netty"]
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm-native" }
+versions = { id = "com.github.ben-manes.versions", version.ref = "versions-plugin" }
