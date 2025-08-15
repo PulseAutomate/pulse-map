@@ -1,6 +1,7 @@
 plugins {
     application
     alias(libs.plugins.versions)
+    alias(libs.plugins.graalvm.native)
 }
 
 dependencies {
@@ -12,4 +13,13 @@ dependencies {
 
 application {
     mainClass.set("io.pulseautomate.map.cli.Main")
+}
+
+graalvmNative {
+    binaries {
+        named("main") {
+            imageName.set("pulse-map")
+            buildArgs.add("-H:+ReportExceptionStackTraces")
+        }
+    }
 }

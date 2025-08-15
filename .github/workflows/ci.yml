@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+# Cancel superseded runs on the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Quick security sanity check for the Gradle wrapper
+  wrapper-validation:
+    name: Validate Gradle Wrapper
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/wrapper-validation-action@v2
+
+  build:
+    name: Build (JDK 21)
+    runs-on: ubuntu-latest
+    needs: wrapper-validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Best-practice Gradle setup with caching
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # Keep code & Gradle scripts tidy (configured in root build.gradle.kts)
+      - name: Spotless check
+        run: ./gradlew spotlessCheck --no-daemon
+
+      # Build everything + run tests
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      # Always publish test reports to help debug failures
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/build/test-results/test
+            **/build/reports/tests/test
+          if-no-files-found: ignore
