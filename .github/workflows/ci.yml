@@ -41,6 +41,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
       # Keep code & Gradle scripts tidy (configured in root build.gradle.kts)
       - name: Spotless check
         run: ./gradlew spotlessCheck --no-daemon
