@@ -1,0 +1,45 @@
+{
+  "schema" : 1,
+  "ha_version" : "2025.6",
+  "entities" : [ {
+    "stable_id" : "stable:aa12…",
+    "entity_id" : "climate.living_room_trv",
+    "domain" : "climate",
+    "device_class" : "heater",
+    "attributes" : {
+      "current_temp_c" : {
+        "kind" : "NUMBER",
+        "unit" : "°C"
+      },
+      "hvac_mode" : {
+        "kind" : "ENUM",
+        "enum" : [ "off", "heat", "auto" ]
+      },
+      "preset_mode" : {
+        "kind" : "ENUM",
+        "enum" : [ "eco", "comfort" ],
+        "optional" : true
+      },
+      "target_temp_c" : {
+        "kind" : "NUMBER",
+        "unit" : "°C",
+        "caps" : {
+          "min" : 5.0,
+          "max" : 30.0,
+          "step" : 0.5
+        }
+      }
+    }
+  } ],
+  "services" : [ {
+    "domain" : "climate",
+    "service" : "set_temperature",
+    "fields" : {
+      "temperature" : {
+        "type" : "number",
+        "unit" : "°C",
+        "required" : true
+      }
+    }
+  } ]
+}
