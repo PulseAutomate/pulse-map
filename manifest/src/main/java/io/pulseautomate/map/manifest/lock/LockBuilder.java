@@ -6,11 +6,15 @@ import io.pulseautomate.map.manifest.model.Manifest;
 import io.pulseautomate.map.manifest.model.Service;
 import io.pulseautomate.map.manifest.serde.ManifestCanonicalizer;
 import io.pulseautomate.map.manifest.serde.ManifestJson;
+import io.pulseautomate.map.manifest.util.Hashing;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import static io.pulseautomate.map.manifest.util.Constants.*;
 
 public final class LockBuilder {
   private LockBuilder() {}
@@ -19,7 +23,7 @@ public final class LockBuilder {
     Objects.requireNonNull(manifest, "manifest");
     Objects.requireNonNull(nowUtc, "nowUtc");
 
-    var manifestHash = sha256Hex(serialise(manifest));
+    var manifestHash = Hashing.sha256Hex(serialise(manifest));
 
     Map<String, String> entityMap = new LinkedHashMap<>();
     Map<String, String> prevMap =
@@ -38,7 +42,7 @@ public final class LockBuilder {
     for (Service s : ManifestCanonicalizer.canonicalize(manifest).services()) {
       var key = s.domain() + "." + s.service();
       var shape = signatureShape(s);
-      serviceSig.put(key, sha256Hex(shape));
+      serviceSig.put(key, Hashing.sha256Hex(shape));
     }
 
     Map<String, List<String>> attrEnums = new LinkedHashMap<>();
@@ -61,7 +65,7 @@ public final class LockBuilder {
     }
 
     return new LockFile(
-        1,
+        LOCK_SCHEMA_V1,
         manifestHash,
         DateTimeFormatter.ISO_INSTANT.format(nowUtc),
         entityMap,
@@ -88,41 +92,17 @@ public final class LockBuilder {
                 var serviceField = e.getValue();
                 var sb = new StringBuilder();
 
-                sb.append(e.getKey()).append(":").append(nullToEmpty(serviceField.type()));
+                sb.append(e.getKey()).append(SIG_PART_SEP).append(nullToEmpty(serviceField.type()));
 
-                if (Boolean.TRUE.equals(serviceField.required())) sb.append(":req");
+                if (Boolean.TRUE.equals(serviceField.required())) sb.append(SIG_REQ_FLAG);
                 if (serviceField.unit() != null && !serviceField.unit().isBlank())
-                  sb.append(":").append(serviceField.unit());
+                  sb.append(SIG_PART_SEP).append(serviceField.unit());
 
                 fields.add(sb.toString());
               });
     }
 
-    return s.domain() + "." + s.service() + "|" + String.join("|", fields);
-  }
-
-  private static String sha256Hex(String s) {
-    try {
-      var md = MessageDigest.getInstance("SHA-256");
-      var d = md.digest(s.getBytes(StandardCharsets.UTF_8));
-      return Hex.of(d);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static final class Hex {
-    private static final char[] HEX = "0123456789abcdef".toCharArray();
-
-    static String of(byte[] b) {
-      var out = new char[b.length * 2];
-      for (int i = 0, j = 0; i < b.length; i++) {
-        var v = b[i] & 0xFF;
-        out[j++] = HEX[v >> 4];
-        out[j++] = HEX[v & 0x0f];
-      }
-      return new String(out);
-    }
+    return s.domain() + "." + s.service() + SIG_MAIN_SEP + String.join(String.valueOf(SIG_FIELD_SEP), fields);
   }
 
   private static String nullToEmpty(String s) {

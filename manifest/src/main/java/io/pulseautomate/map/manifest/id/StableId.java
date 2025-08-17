@@ -1,18 +1,21 @@
 package io.pulseautomate.map.manifest.id;
 
+import io.pulseautomate.map.manifest.util.Hashing;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.Objects;
+
+import static io.pulseautomate.map.manifest.util.Constants.STABLE_ID_HEX_LENGTH;
+import static io.pulseautomate.map.manifest.util.Constants.STABLE_PREFIX;
 
 public final class StableId {
   private StableId() {}
 
   public static String derive(String seed) {
     Objects.requireNonNull(seed, "seed");
-    var bytes = sha256(seed);
-    var hex = HexFormat.of().formatHex(bytes);
-    return "stable: " + hex.substring(0, 12);
+    var hex = Hashing.sha256Hex(seed);
+    return STABLE_PREFIX + hex.substring(0, STABLE_ID_HEX_LENGTH);
   }
 
   private static byte[] sha256(String s) {
