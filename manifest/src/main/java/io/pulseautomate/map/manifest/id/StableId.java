@@ -1,13 +1,12 @@
 package io.pulseautomate.map.manifest.id;
 
-import io.pulseautomate.map.manifest.util.Hashing;
+import static io.pulseautomate.map.manifest.util.Constants.STABLE_ID_HEX_LENGTH;
+import static io.pulseautomate.map.manifest.util.Constants.STABLE_PREFIX;
 
+import io.pulseautomate.map.manifest.util.Hashing;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Objects;
-
-import static io.pulseautomate.map.manifest.util.Constants.STABLE_ID_HEX_LENGTH;
-import static io.pulseautomate.map.manifest.util.Constants.STABLE_PREFIX;
 
 public final class StableId {
   private StableId() {}

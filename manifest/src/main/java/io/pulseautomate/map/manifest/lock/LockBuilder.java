@@ -1,5 +1,7 @@
 package io.pulseautomate.map.manifest.lock;
 
+import static io.pulseautomate.map.manifest.util.Constants.*;
+
 import io.pulseautomate.map.manifest.id.StableId;
 import io.pulseautomate.map.manifest.model.Entity;
 import io.pulseautomate.map.manifest.model.Manifest;
@@ -7,14 +9,9 @@ import io.pulseautomate.map.manifest.model.Service;
 import io.pulseautomate.map.manifest.serde.ManifestCanonicalizer;
 import io.pulseautomate.map.manifest.serde.ManifestJson;
 import io.pulseautomate.map.manifest.util.Hashing;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-
-import static io.pulseautomate.map.manifest.util.Constants.*;
 
 public final class LockBuilder {
   private LockBuilder() {}
@@ -102,7 +99,11 @@ public final class LockBuilder {
               });
     }
 
-    return s.domain() + "." + s.service() + SIG_MAIN_SEP + String.join(String.valueOf(SIG_FIELD_SEP), fields);
+    return s.domain()
+        + "."
+        + s.service()
+        + SIG_MAIN_SEP
+        + String.join(String.valueOf(SIG_FIELD_SEP), fields);
   }
 
   private static String nullToEmpty(String s) {
