@@ -1,0 +1,190 @@
+package io.pulseautomate.map.manifest.infer;
+
+import static io.pulseautomate.map.manifest.util.Constants.*;
+import static io.pulseautomate.map.manifest.util.Names.HaAttr.SUPPORTED_COLOR_MODES;
+
+import io.pulseautomate.map.ha.model.HAState;
+import io.pulseautomate.map.manifest.model.AttributeDesc;
+import io.pulseautomate.map.manifest.model.CapabilityRange;
+import io.pulseautomate.map.manifest.model.FieldKind;
+import io.pulseautomate.map.manifest.util.Temperature;
+import java.util.*;
+import java.util.function.Predicate;
+
+public final class AttributeRules {
+  private AttributeRules() {}
+
+  public static AttributeRule enumFrom(
+      String canonicalName, String listKey, String fallbackOneOfKey, boolean optional) {
+    return state -> {
+      var a = state.attributes();
+      var list = asStringList(a.get(listKey));
+
+      if (!list.isEmpty()) {
+        return Optional.of(
+            Map.entry(
+                canonicalName,
+                new AttributeDesc(
+                    FieldKind.ENUM, null, list, optional ? Boolean.TRUE : null, null)));
+      }
+
+      if (fallbackOneOfKey != null && a.get(fallbackOneOfKey) instanceof String one) {
+        return Optional.of(
+            Map.entry(
+                canonicalName,
+                new AttributeDesc(
+                    FieldKind.ENUM, null, List.of(one), optional ? Boolean.TRUE : null, null)));
+      }
+
+      return Optional.empty();
+    };
+  }
+
+  public static AttributeRule numberWithCapsTempC(
+      String canonicalName,
+      String unit,
+      String minKey,
+      String maxKey,
+      String stepKey,
+      String unitAttrKey) {
+    return state -> {
+      var a = state.attributes();
+      var min = num(a.get(minKey));
+      var max = num(a.get(maxKey));
+      var step = num(a.get(stepKey));
+
+      if (step == null) step = 0.5;
+
+      var u = str(a.get(unitAttrKey));
+      if (u != null
+          && (u.equalsIgnoreCase(UNIT_FAHRENHEIT_WITH_SYMBOL)
+              || u.equalsIgnoreCase(UNIT_FAHRENHEIT)
+              || u.equalsIgnoreCase(FAHRENHEIT))) {
+        if (min != null) min = Temperature.fToC(min);
+        if (max != null) max = Temperature.fToC(max);
+        step = step * (5.0 / 9.0);
+      }
+
+      return Optional.of(
+          Map.entry(
+              canonicalName,
+              new AttributeDesc(
+                  FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
+    };
+  }
+
+  public static AttributeRule numberWithFixedCaps(
+      String canonicalName, String unit, double min, double max, double step) {
+    return state ->
+        Optional.of(
+            Map.entry(
+                canonicalName,
+                new AttributeDesc(
+                    FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
+  }
+
+  public static AttributeRule numberDescriptor(String canonicalName, String unit) {
+    return state ->
+        Optional.of(
+            Map.entry(canonicalName, new AttributeDesc(FieldKind.NUMBER, unit, null, null, null)));
+  }
+
+  public static AttributeRule presentIfAny(AttributeRule base, String... haAttrKeys) {
+    Set<String> keys = Set.of(haAttrKeys);
+    return state -> {
+      var a = state.attributes();
+      for (var k : keys) if (a.containsKey(k)) return base.infer(state);
+      return Optional.empty();
+    };
+  }
+
+  public static AttributeRule presentIfAll(AttributeRule base, String... haAttrKeys) {
+    Set<String> keys = Set.of(haAttrKeys);
+    return state -> {
+      var a = state.attributes();
+      for (var k : keys) if (!a.containsKey(k)) return Optional.empty();
+      return base.infer(state);
+    };
+  }
+
+  public static AttributeRule presentIf(AttributeRule base, Predicate<HAState> pred) {
+    return state -> pred.test(state) ? base.infer(state) : Optional.empty();
+  }
+
+  public static AttributeRule booleanFlag(String canonicalName, String presenceKey) {
+    return presentIfAny(
+        state ->
+            Optional.of(
+                Map.entry(
+                    canonicalName,
+                    new AttributeDesc(FieldKind.BOOLEAN, null, null, Boolean.TRUE, null))),
+        presenceKey);
+  }
+
+  public static AttributeRule percentPct(String canonicalName) {
+    return numberWithFixedCaps(canonicalName, UNIT_PERCENT, 0, 100, 1);
+  }
+
+  public static AttributeRule colorTempKelvinFromMireds(
+      String canonicalName, String minMiredKey, String maxMiredKey) {
+    return presentIfAll(
+        state -> {
+          var a = state.attributes();
+          var minMired = num(a.get(minMiredKey));
+          var maxMired = num(a.get(maxMiredKey));
+
+          if (minMired == null || maxMired == null) return Optional.empty();
+
+          var minK = 1_000_000.0 / maxMired;
+          var maxK = 1_000_000.0 / minMired;
+
+          var cap = new CapabilityRange(minK, maxK, COLOR_TEMP_STEP_K);
+          return Optional.of(
+              Map.entry(
+                  canonicalName,
+                  new AttributeDesc(FieldKind.NUMBER, UNIT_KELVIN, null, null, cap)));
+        },
+        minMiredKey,
+        maxMiredKey);
+  }
+
+  public static AttributeRule hueDegrees(String canonicalName) {
+    return numberWithFixedCaps(canonicalName, DEGREE_SYMBOL, 0, 360, 1);
+  }
+
+  public static AttributeRule saturationPct(String canonicalName) {
+    return percentPct(canonicalName);
+  }
+
+  public static Predicate<HAState> colorModeIncludes(String mode) {
+    return state -> {
+      var o = state.attributes().get(SUPPORTED_COLOR_MODES);
+      if (!(o instanceof List<?> list)) return false;
+      for (var it : list) if (mode.equalsIgnoreCase(String.valueOf(it))) return true;
+      return false;
+    };
+  }
+
+  private static List<String> asStringList(Object o) {
+    if (o instanceof List<?> list) {
+      var out = new ArrayList<String>();
+      for (var it : list) if (it != null) out.add(it.toString());
+      return out;
+    }
+
+    return List.of();
+  }
+
+  private static Double num(Object o) {
+    if (o instanceof Number n) return n.doubleValue();
+    try {
+      return o != null ? Double.parseDouble(o.toString()) : null;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static String str(Object o) {
+    return o == null ? null : o.toString();
+  }
+}
