@@ -2,7 +2,10 @@ package io.pulseautomate.map.cli.run;
 
 import io.pulseautomate.map.ha.client.HAHttpClient;
 import io.pulseautomate.map.ha.config.HAConfig;
+import io.pulseautomate.map.ha.model.HAService;
+import io.pulseautomate.map.ha.model.HAServiceField;
 import io.pulseautomate.map.ha.model.HASnapshot;
+import io.pulseautomate.map.ha.model.HAState;
 import io.pulseautomate.map.manifest.builder.ManifestBuilder;
 import io.pulseautomate.map.manifest.lock.LockBuilder;
 import io.pulseautomate.map.manifest.lock.LockFile;
@@ -14,8 +17,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public final class DiscoverRunner {
 
@@ -45,6 +47,11 @@ public final class DiscoverRunner {
           }
         };
 
+    return new DiscoverRunner(provider, new ManifestBuilder());
+  }
+
+  public static DiscoverRunner forDemo(String haVersionOpt) {
+    var provider = new DemoProvider(haVersionOpt);
     return new DiscoverRunner(provider, new ManifestBuilder());
   }
 
@@ -114,6 +121,73 @@ public final class DiscoverRunner {
     @Override
     public String haVersion() throws Exception {
       return (haVersionOpt != null && !haVersionOpt.isBlank()) ? haVersionOpt : "unknown";
+    }
+  }
+
+  private static final class DemoProvider implements SnapshotProvider {
+    private final String versionOpt;
+
+    DemoProvider(String versionOpt) {
+      this.versionOpt = versionOpt;
+    }
+
+    @Override
+    public HASnapshot fetch() {
+      List<HAState> states = new ArrayList<>();
+
+      // climate
+      var aClimate = new LinkedHashMap<String, Object>();
+      aClimate.put("device_class", "heater");
+      aClimate.put("hvac_modes", List.of("off", "heat", "auto"));
+      aClimate.put("preset_modes", List.of("eco", "comfort"));
+      aClimate.put("min_temp", 5.0);
+      aClimate.put("max_temp", 30.0);
+      aClimate.put("target_temp_step", 0.5);
+      aClimate.put("temperature_unit", "°C");
+      states.add(new HAState("climate.living_room_trv", "heat", aClimate, null, null));
+
+      // light
+      var aLight = new LinkedHashMap<String, Object>();
+      aLight.put("supported_color_modes", List.of("hs", "color_temp"));
+      aLight.put("brightness", 180);
+      aLight.put("min_mireds", 153);
+      aLight.put("max_mireds", 500);
+      aLight.put("effect_list", List.of("rainbow", "night"));
+      states.add(new HAState("light.lamp", "on", aLight, null, null));
+
+      // fan
+      var aFan = new LinkedHashMap<String, Object>();
+      aFan.put("percentage", 33);
+      aFan.put("preset_modes", List.of("auto", "boost"));
+      aFan.put("direction", "forward");
+      aFan.put("oscillating", true);
+      states.add(new HAState("fan.tower", "on", aFan, null, null));
+
+      // cover
+      var aCover = new LinkedHashMap<String, Object>();
+      aCover.put("current_position", 42);
+      aCover.put("current_tilt_position", 10);
+      states.add(new HAState("cover.blind", "open", aCover, null, null));
+
+      // media_player
+      var aTv = new LinkedHashMap<String, Object>();
+      aTv.put("volume_level", 0.35);
+      aTv.put("source_list", List.of("TV", "HDMI1"));
+      aTv.put("sound_mode_list", List.of("stereo", "movie"));
+      states.add(new HAState("media_player.lg_tv", "on", aTv, null, null));
+
+      // Services (minimal example)
+      Map<String, HAServiceField> climateSetTemp =
+          Map.of("temperature", new HAServiceField(true, null, null, "Set temperature"));
+      List<HAService> services =
+          List.of(new HAService("climate", "set_temperature", climateSetTemp));
+
+      return new HASnapshot(states, services);
+    }
+
+    @Override
+    public String haVersion() {
+      return versionOpt != null ? versionOpt : "demo";
     }
   }
 }

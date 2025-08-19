@@ -9,7 +9,8 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "discover",
     mixinStandardHelpOptions = true,
-    description = "Discover from Home Assistant and write manifest.json and map.lock.json")
+    description =
+        "Discover from Home Assistant (or demo) and write manifest.json and map.lock.json")
 public final class DiscoverCommand implements Callable<Integer> {
   @CommandLine.Option(
       names = {"--out"},
@@ -36,17 +37,43 @@ public final class DiscoverCommand implements Callable<Integer> {
       description = "Home Assistant version label to embed in manifest (fallback: $HA_VERSION)")
   String haVersion;
 
+  @CommandLine.Option(
+      names = {"--demo"},
+      description = "Use built-in demo snapshot (ignores HA URL/token)")
+  boolean demo;
+
+  @CommandLine.Option(
+      names = {"--verbose", "-v"},
+      description = "Enable verbose output (default: false)")
+  boolean verbose;
+
   static DiscoverRunner.Factory factory = DiscoverRunner::forHomeAssistant;
 
   @Override
   public Integer call() throws Exception {
-    var url = haUrl != null ? haUrl : envUri("HA_URL");
-    var token = firstNonBlank(haToken, getEnv("HA_TOKEN"));
-    var version = firstNonBlank(haVersion, getEnv("HA_VERSION"));
+    final var url = haUrl != null ? haUrl : envUri("HA_URL");
+    final var token = firstNonBlank(haToken, getEnv("HA_TOKEN"));
+    final var version = firstNonBlank(haVersion, getEnv("HA_VERSION"));
 
-    DiscoverRunner runner;
-    if (url == null || isBlank(token)) runner = DiscoverRunner.forSnapshotOnly(version);
-    else runner = factory.create(url, token, version);
+    final var useHA = (url != null && !isBlank(token));
+    final var runner =
+        demo
+            ? DiscoverRunner.forDemo(version)
+            : (useHA
+                ? factory.create(url, token, version)
+                : DiscoverRunner.forSnapshotOnly(version));
+
+    if (verbose) {
+      System.out.println(
+          "[pulse-map] mode="
+              + (demo ? "demo" : (useHA ? "ha" : "snapshot"))
+              + " out="
+              + outDir.toAbsolutePath()
+              + " haUrl="
+              + (url == null ? "(none)" : url)
+              + " haVersion="
+              + (version == null ? "(none)" : version));
+    }
 
     var res = runner.run(outDir);
 
