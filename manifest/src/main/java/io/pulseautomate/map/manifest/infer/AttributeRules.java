@@ -83,6 +83,27 @@ public final class AttributeRules {
                     FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
   }
 
+  public static AttributeRule numberWithCapsFromKeys(
+      String canonicalName, String unitKey, String minKey, String maxKey, String stepKey) {
+    return state -> {
+      var a = state.attributes();
+      var min = num(a.get(minKey));
+      var max = num(a.get(maxKey));
+      var step = num(a.get(stepKey));
+      var unit = str(a.get(unitKey));
+
+      if (step == null) step = 1.0;
+
+      if (min == null || max == null && unit == null) return Optional.empty();
+
+      return Optional.of(
+          Map.entry(
+              canonicalName,
+              new AttributeDesc(
+                  FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
+    };
+  }
+
   public static AttributeRule numberDescriptor(String canonicalName, String unit) {
     return state ->
         Optional.of(

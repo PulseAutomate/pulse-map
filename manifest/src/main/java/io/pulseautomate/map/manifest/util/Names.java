@@ -9,6 +9,7 @@ public final class Names {
     public static final String FAN = "fan";
     public static final String COVER = "cover";
     public static final String MEDIA_PLAYER = "media_player";
+    public static final String NUMBER = "number";
   }
 
   public static final class Attr {
@@ -33,6 +34,8 @@ public final class Names {
     public static final String VOLUME_PCT = "volume_pct";
     public static final String SOURCE = "source";
     public static final String SOUND_MODE = "sound_mode";
+
+    public static final String VALUE = "value";
   }
 
   public static final class HaAttr {
@@ -66,10 +69,39 @@ public final class Names {
     public static final String SOURCE_LIST = "source_list";
     public static final String SOUND_MODE = "sound_mode";
     public static final String SOUND_MODE_LIST = "sound_mode_list";
+
+    public static final String MIN = "min";
+    public static final String MAX = "max";
+    public static final String STEP = "step";
+    public static final String UNIT_OF_MEASUREMENT = "unit_of_measurement";
   }
 
   public static final class ColorMode {
     public static final String HS = "hs";
     public static final String COLOR_TEMP = "color_temp";
+  }
+
+  public static final class SvcField {
+    public static final String TEMPERATURE = "temperature";
+    public static final String HVAC_MODE = "hvac_mode";
+    public static final String PRESET_MODE = "preset_mode";
+
+    public static final String BRIGHTNESS_PCT = "brightness_pct";
+    public static final String COLOR_TEMP = "color_temp";
+    public static final String COLOR_TEMP_KELVIN = "color_temp_kelvin";
+    public static final String KELVIN = "kelvin";
+    public static final String TRANSITION = "transition";
+    public static final String EFFECT = "effect";
+
+    public static final String PERCENTAGE = "percentage";
+    public static final String DIRECTION = "direction";
+    public static final String POSITION = "position";
+    public static final String TILT_POSITION = "tilt_position";
+
+    public static final String VOLUME_LEVEL = "volume_level";
+    public static final String SOURCE = "source";
+    public static final String SOUND_MODE = "sound_mode";
+
+    public static final String VALUE = "value";
   }
 }

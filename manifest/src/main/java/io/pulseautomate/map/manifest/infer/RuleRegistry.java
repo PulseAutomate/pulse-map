@@ -12,8 +12,10 @@ import static io.pulseautomate.map.manifest.util.Names.HaAttr.CURRENT_TILT_POSIT
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.DIRECTION_LIST;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.EFFECT_LIST;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.HVAC_MODES;
+import static io.pulseautomate.map.manifest.util.Names.HaAttr.MAX;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.MAX_MIREDS;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.MAX_TEMP;
+import static io.pulseautomate.map.manifest.util.Names.HaAttr.MIN;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.MIN_MIREDS;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.MIN_TEMP;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.PERCENTAGE;
@@ -22,10 +24,12 @@ import static io.pulseautomate.map.manifest.util.Names.HaAttr.PRESET_MODES;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.SOUND_MODE_LIST;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.SOURCE_LIST;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.SPEED_LIST;
+import static io.pulseautomate.map.manifest.util.Names.HaAttr.STEP;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.SUPPORTED_COLOR_MODES;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.TARGET_TEMP_STEP;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.TEMPERATURE_UNIT;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.TILT_POSITION;
+import static io.pulseautomate.map.manifest.util.Names.HaAttr.UNIT_OF_MEASUREMENT;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.VOLUME_LEVEL;
 
 import java.util.LinkedHashMap;
@@ -91,7 +95,17 @@ public final class RuleRegistry {
             enumFrom(SOURCE, SOURCE_LIST, SOURCE, true),
             enumFrom(SOUND_MODE, SOUND_MODE_LIST, SOUND_MODE, true));
 
-    return new RuleRegistry(createRuleMap(climate, light, fan, cover, media));
+    var number =
+        create(
+            NUMBER,
+            presentIfAny(
+                numberWithCapsFromKeys(VALUE, UNIT_OF_MEASUREMENT, MIN, MAX, STEP),
+                MIN,
+                MAX,
+                STEP,
+                UNIT_OF_MEASUREMENT));
+
+    return new RuleRegistry(createRuleMap(climate, light, fan, cover, media, number));
   }
 
   private static DomainRuleSet create(String domain, AttributeRule... attributeRule) {

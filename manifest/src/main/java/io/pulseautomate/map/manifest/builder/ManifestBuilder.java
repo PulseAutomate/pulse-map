@@ -53,7 +53,8 @@ public final class ManifestBuilder {
       fields = null;
     }
 
-    return new Service(hs.domain(), hs.service(), fields);
+    var typedFields = ServiceTyping.apply(hs, fields);
+    return new Service(hs.domain(), hs.service(), typedFields);
   }
 
   private static String domainOf(String entityId) {
