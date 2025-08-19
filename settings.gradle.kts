@@ -1,5 +1,5 @@
 rootProject.name = "pulse-map"
-include("app-cli")
+include("map-cli")
 include("mapd")
 include("ha-client")
 include("manifest")

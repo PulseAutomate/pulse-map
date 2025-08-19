@@ -6,7 +6,7 @@ plugins {
 
 allprojects {
     group = "io.pulseautomate"
-    version = "0.1.0-SNAPSHOT"
+    version = project.version
 
     repositories { mavenCentral() }
 }
