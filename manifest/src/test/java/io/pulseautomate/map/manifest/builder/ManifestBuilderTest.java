@@ -156,8 +156,7 @@ class ManifestBuilderTest {
     assertThat(s.service()).isEqualTo("set_temperature");
     assertThat(s.fields()).containsKey("temperature");
     assertThat(s.fields().get("temperature").required()).isTrue();
-    // type/unit are intentionally null at this stage (schema-only pass-through)
-    assertThat(s.fields().get("temperature").type()).isNull();
-    assertThat(s.fields().get("temperature").unit()).isNull();
+    assertThat(s.fields().get("temperature").type()).isEqualTo("number");
+    assertThat(s.fields().get("temperature").unit()).isEqualTo(UNIT_CELSIUS_WITH_SYMBOL);
   }
 }
