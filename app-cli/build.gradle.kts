@@ -25,7 +25,16 @@ graalvmNative {
     binaries {
         named("main") {
             imageName.set("pulse-map")
-            buildArgs.add("-H:+ReportExceptionStackTraces")
+
+            configurationFileDirectories.from(
+                file("${layout.buildDirectory}/native/agent-output/main"),
+                file("${layout.buildDirectory}/native/agent-output/test")
+            )
+
+            buildArgs.addAll(listOf(
+                "--no-fallback",
+                "--install-exit-handlers"
+            ))
         }
     }
 }

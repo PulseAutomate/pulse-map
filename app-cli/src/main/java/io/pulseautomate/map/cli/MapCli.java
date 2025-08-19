@@ -1,5 +1,7 @@
 package io.pulseautomate.map.cli;
 
+import io.pulseautomate.map.cli.commands.DiscoverCommand;
+import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
 @CommandLine.Command(
@@ -7,15 +9,17 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     version = "pulse-map 0.1",
     description = "Pulse Map CLI",
-    subcommands = {})
-public final class MapCli implements Runnable {
+    subcommands = {DiscoverCommand.class},
+    synopsisSubcommandLabel = "COMMAND")
+public final class MapCli implements Callable<Integer> {
   public static void main(String[] args) {
     var code = new CommandLine(new MapCli()).execute(args);
     System.exit(code);
   }
 
   @Override
-  public void run() {
+  public Integer call() throws Exception {
     new CommandLine(this).usage(System.out);
+    return CommandLine.ExitCode.OK;
   }
 }
