@@ -4,9 +4,9 @@ import static io.pulseautomate.map.manifest.util.Constants.*;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.SUPPORTED_COLOR_MODES;
 
 import io.pulseautomate.map.ha.model.HAState;
-import io.pulseautomate.map.manifest.model.AttributeDesc;
-import io.pulseautomate.map.manifest.model.CapabilityRange;
-import io.pulseautomate.map.manifest.model.FieldKind;
+import io.pulseautomate.map.manifest.gen.model.AttributeDesc;
+import io.pulseautomate.map.manifest.gen.model.CapabilityRange;
+import io.pulseautomate.map.manifest.gen.model.FieldKind;
 import io.pulseautomate.map.manifest.util.Temperature;
 import java.util.*;
 import java.util.function.Predicate;
@@ -20,20 +20,17 @@ public final class AttributeRules {
       var a = state.attributes();
       var list = asStringList(a.get(listKey));
 
+      var desc = AttributeDesc.newBuilder().setKind(FieldKind.ENUM);
+      if (optional) desc.setOptional(Boolean.TRUE);
+
       if (!list.isEmpty()) {
-        return Optional.of(
-            Map.entry(
-                canonicalName,
-                new AttributeDesc(
-                    FieldKind.ENUM, null, list, optional ? Boolean.TRUE : null, null)));
+        desc.addAllEnumValues(list);
+        return Optional.of(Map.entry(canonicalName, desc.build()));
       }
 
       if (fallbackOneOfKey != null && a.get(fallbackOneOfKey) instanceof String one) {
-        return Optional.of(
-            Map.entry(
-                canonicalName,
-                new AttributeDesc(
-                    FieldKind.ENUM, null, List.of(one), optional ? Boolean.TRUE : null, null)));
+        desc.addEnumValues(one);
+        return Optional.of(Map.entry(canonicalName, desc.build()));
       }
 
       return Optional.empty();
@@ -52,6 +49,7 @@ public final class AttributeRules {
       var min = num(a.get(minKey));
       var max = num(a.get(maxKey));
       var step = num(a.get(stepKey));
+      var cap = CapabilityRange.newBuilder();
 
       if (step == null) step = 0.5;
 
@@ -60,16 +58,23 @@ public final class AttributeRules {
           && (u.equalsIgnoreCase(UNIT_FAHRENHEIT_WITH_SYMBOL)
               || u.equalsIgnoreCase(UNIT_FAHRENHEIT)
               || u.equalsIgnoreCase(FAHRENHEIT))) {
-        if (min != null) min = Temperature.fToC(min);
-        if (max != null) max = Temperature.fToC(max);
-        step = step * (5.0 / 9.0);
+        if (min != null) cap.setMin(Temperature.fToC(min));
+        if (max != null) cap.setMax(Temperature.fToC(max));
+        cap.setStep(step * (5.0 / 9.0));
+      } else {
+        if (min != null) cap.setMin(min);
+        if (max != null) cap.setMax(max);
+        cap.setStep(step);
       }
 
       return Optional.of(
           Map.entry(
               canonicalName,
-              new AttributeDesc(
-                  FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
+              AttributeDesc.newBuilder()
+                  .setKind(FieldKind.NUMBER)
+                  .setUnit(unit)
+                  .setCaps(cap)
+                  .build()));
     };
   }
 
@@ -79,8 +84,11 @@ public final class AttributeRules {
         Optional.of(
             Map.entry(
                 canonicalName,
-                new AttributeDesc(
-                    FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
+                AttributeDesc.newBuilder()
+                    .setKind(FieldKind.NUMBER)
+                    .setUnit(unit)
+                    .setCaps(CapabilityRange.newBuilder().setMin(min).setMax(max).setStep(step))
+                    .build()));
   }
 
   public static AttributeRule numberWithCapsFromKeys(
@@ -92,22 +100,30 @@ public final class AttributeRules {
       var step = num(a.get(stepKey));
       var unit = str(a.get(unitKey));
 
-      if (step == null) step = 1.0;
+      var cap = CapabilityRange.newBuilder();
+      cap.setStep(step == null ? 1.0 : step);
 
       if (min == null || max == null && unit == null) return Optional.empty();
+      cap.setMin(min);
+      if (max != null) cap.setMax(max);
 
       return Optional.of(
           Map.entry(
               canonicalName,
-              new AttributeDesc(
-                  FieldKind.NUMBER, unit, null, null, new CapabilityRange(min, max, step))));
+              AttributeDesc.newBuilder()
+                  .setKind(FieldKind.NUMBER)
+                  .setUnit(unit)
+                  .setCaps(cap)
+                  .build()));
     };
   }
 
   public static AttributeRule numberDescriptor(String canonicalName, String unit) {
     return state ->
         Optional.of(
-            Map.entry(canonicalName, new AttributeDesc(FieldKind.NUMBER, unit, null, null, null)));
+            Map.entry(
+                canonicalName,
+                AttributeDesc.newBuilder().setKind(FieldKind.NUMBER).setUnit(unit).build()));
   }
 
   public static AttributeRule presentIfAny(AttributeRule base, String... haAttrKeys) {
@@ -138,7 +154,10 @@ public final class AttributeRules {
             Optional.of(
                 Map.entry(
                     canonicalName,
-                    new AttributeDesc(FieldKind.BOOLEAN, null, null, Boolean.TRUE, null))),
+                    AttributeDesc.newBuilder()
+                        .setKind(FieldKind.BOOLEAN)
+                        .setOptional(Boolean.TRUE)
+                        .build())),
         presenceKey);
   }
 
@@ -159,11 +178,18 @@ public final class AttributeRules {
           var minK = 1_000_000.0 / maxMired;
           var maxK = 1_000_000.0 / minMired;
 
-          var cap = new CapabilityRange(minK, maxK, COLOR_TEMP_STEP_K);
           return Optional.of(
               Map.entry(
                   canonicalName,
-                  new AttributeDesc(FieldKind.NUMBER, UNIT_KELVIN, null, null, cap)));
+                  AttributeDesc.newBuilder()
+                      .setKind(FieldKind.NUMBER)
+                      .setUnit(UNIT_KELVIN)
+                      .setCaps(
+                          CapabilityRange.newBuilder()
+                              .setMin(minK)
+                              .setMax(maxK)
+                              .setStep(COLOR_TEMP_STEP_K))
+                      .build()));
         },
         minMiredKey,
         maxMiredKey);

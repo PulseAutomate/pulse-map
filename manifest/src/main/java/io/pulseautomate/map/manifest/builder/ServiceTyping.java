@@ -6,7 +6,7 @@ import static io.pulseautomate.map.manifest.util.Names.SvcField.*;
 import static io.pulseautomate.map.manifest.util.Names.SvcField.KELVIN;
 
 import io.pulseautomate.map.ha.model.HAService;
-import io.pulseautomate.map.manifest.model.ServiceField;
+import io.pulseautomate.map.manifest.gen.model.ServiceField;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -25,8 +25,8 @@ public final class ServiceTyping {
   }
 
   private static ServiceField typed(String domain, String service, String name, ServiceField f) {
-    var type = f.type();
-    var unit = f.unit();
+    var type = f.getType();
+    var unit = f.getUnit();
 
     // --- Climate ---
     if (CLIMATE.equals(domain)) {
@@ -103,8 +103,12 @@ public final class ServiceTyping {
       type = nullable(type, "number");
     }
 
-    if (Objects.equals(type, f.type()) && Objects.equals(unit, f.unit())) return f;
-    return new ServiceField(type, unit, f.required());
+    if (Objects.equals(type, f.getType()) && Objects.equals(unit, f.getUnit())) return f;
+    return ServiceField.newBuilder()
+        .setType(type)
+        .setUnit(unit)
+        .setRequired(f.getRequired())
+        .build();
   }
 
   private static String nullable(String current, String candidate) {

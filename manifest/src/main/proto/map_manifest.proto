@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package pulse.map.v1;
+
+option java_multiple_files = true;
+option java_package = "io.pulseautomate.map.manifest.gen.model";
+option java_outer_classname = "MapManifestProtos";
+
+// ===== Manifest =====
+message Manifest {
+  int32 schema = 1;
+  string ha_version = 2;
+  repeated Entity entities = 3;
+  repeated Service services = 4;
+}
+
+message Entity {
+  string stable_id = 1;
+  string entity_id = 2;
+  string domain = 3;
+  string device_class = 4;
+  string area = 5;
+  map<string, AttributeDesc> attributes = 6;
+}
+
+enum FieldKind {
+  FIELD_KIND_UNSPECIFIED = 0;
+  NUMBER = 1;
+  ENUM = 2;
+  BOOLEAN = 3;
+  STRING = 4;
+}
+
+message CapabilityRange {
+  double min = 1;
+  double max = 2;
+  double step = 3;
+}
+
+message AttributeDesc {
+  FieldKind kind = 1;
+  string unit = 2;
+  repeated string enum_values = 3;
+  bool optional = 4;
+  CapabilityRange caps = 5;
+}
+
+message Service {
+  string domain = 1;
+  string service = 2;
+  map<string, ServiceField> fields = 3;
+}
+
+message ServiceField {
+  string type = 1;
+  string unit = 2;
+  bool required = 3;
+}
+
+// ===== Lock =====
+message LockFile {
+  int32 schema = 1;
+  string manifest_hash = 2;
+  string generated_at = 3;
+  map<string, string> entity_map = 4;
+  map<string, string> service_sig = 5;
+  map<string, EnumCache> attr_enums = 6;
+}
+
+message EnumCache {
+  repeated string values = 1;
+}

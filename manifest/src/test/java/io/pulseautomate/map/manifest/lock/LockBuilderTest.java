@@ -2,88 +2,96 @@ package io.pulseautomate.map.manifest.lock;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.pulseautomate.map.manifest.model.*;
-import io.pulseautomate.map.manifest.serde.ManifestCanonicalizer;
-import io.pulseautomate.map.manifest.serde.ManifestJson;
+import io.pulseautomate.map.manifest.gen.model.*;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class LockBuilderTest {
 
   private Manifest sampleManifest() {
-    var attrs = new LinkedHashMap<String, AttributeDesc>();
-    attrs.put(
-        "hvac_mode",
-        new AttributeDesc(FieldKind.ENUM, null, List.of("off", "heat", "auto"), null, null));
-    attrs.put(
-        "preset_mode",
-        new AttributeDesc(FieldKind.ENUM, null, List.of("eco", "comfort"), true, null));
-    attrs.put("current_temp_c", new AttributeDesc(FieldKind.NUMBER, "°C", null, null, null));
-    attrs.put(
-        "target_temp_c",
-        new AttributeDesc(FieldKind.NUMBER, "°C", null, null, new CapabilityRange(5.0, 30.0, 0.5)));
+    var hvacAttr =
+        AttributeDesc.newBuilder()
+            .setKind(FieldKind.ENUM)
+            .addAllEnumValues(List.of("off", "heat", "auto"))
+            .build();
+    var presetAttr =
+        AttributeDesc.newBuilder()
+            .setKind(FieldKind.ENUM)
+            .setOptional(true)
+            .addAllEnumValues(List.of("eco", "comfort"))
+            .build();
 
     var entity =
-        new Entity("stable:aa12…", "climate.living_room_trv", "climate", "heater", null, attrs);
+        Entity.newBuilder()
+            .setStableId("stable:aa12…")
+            .setEntityId("climate.living_room_trv")
+            .setDomain("climate")
+            .setDeviceClass("heater")
+            .putAttributes("hvac_mode", hvacAttr)
+            .putAttributes("preset_mode", presetAttr)
+            .build();
 
-    var fields = new LinkedHashMap<String, ServiceField>();
-    fields.put("temperature", new ServiceField("number", "°C", true));
-    var service = new Service("climate", "set_temperature", fields);
+    var service =
+        Service.newBuilder()
+            .setDomain("climate")
+            .setService("set_temperature")
+            .putFields(
+                "temperature",
+                ServiceField.newBuilder().setType("number").setUnit("°C").setRequired(true).build())
+            .build();
 
-    return new Manifest(1, "2025.6", List.of(entity), List.of(service));
+    return Manifest.newBuilder()
+        .setSchema(1)
+        .setHaVersion("2025.6")
+        .addEntities(entity)
+        .addServices(service)
+        .build();
   }
 
   @Test
-  void builds_lock_with_hashes_and_maps() throws Exception {
+  void builds_lock_with_hashes_and_maps() {
     var manifest = sampleManifest();
     var now = Instant.parse("2025-08-14T19:00:00Z");
     var lock = LockBuilder.build(manifest, null, now);
 
-    // manifest hash should be sha256 of canonicalized pretty json
-    var canonJson = ManifestJson.toPrettyString(ManifestCanonicalizer.canonicalize(manifest));
-    assertThat(lock.manifest_hash()).hasSize(64);
-    assertThat(lock.generated_at()).isEqualTo("2025-08-14T19:00:00Z");
-
-    // entity map should contain our entity_id -> stable_id
-    assertThat(lock.entity_map()).containsEntry("climate.living_room_trv", "stable:aa12…");
-
-    // service signature should exist and be deterministic
-    var sig = lock.service_sig().get("climate.set_temperature");
-    assertThat(sig).isNotNull().hasSize(64);
-
-    // attr enums should contain climate.hvac_mode & preset_mode; sorted/deduped
-    assertThat(lock.attr_enums()).isNotNull();
-    assertThat(lock.attr_enums().get("climate.hvac_mode")).containsExactly("auto", "heat", "off");
-    assertThat(lock.attr_enums().get("climate.preset_mode")).containsExactly("comfort", "eco");
+    assertThat(lock.getManifestHash()).hasSize(64);
+    assertThat(lock.getGeneratedAt()).isEqualTo("2025-08-14T19:00:00Z");
+    assertThat(lock.getEntityMapMap()).containsEntry("climate.living_room_trv", "stable:aa12…");
+    assertThat(lock.getServiceSigMap().get("climate.set_temperature")).isNotNull().hasSize(64);
+    assertThat(lock.getAttrEnumsMap().get("climate.hvac_mode").getValuesList())
+        .containsExactly("auto", "heat", "off");
+    assertThat(lock.getAttrEnumsMap().get("climate.preset_mode").getValuesList())
+        .containsExactly("comfort", "eco");
   }
 
   @Test
   void reuses_previous_mapping_when_stable_id_missing() {
-    // manifest has NO stable_id (simulating earlier stage before we compute it)
-    var entity = new Entity(null, "light.kitchen", "light", null, null, null);
-    var manifest = new Manifest(1, "2025.6", List.of(entity), List.of());
+    var entity = Entity.newBuilder().setEntityId("light.kitchen").setDomain("light").build();
+    var manifest =
+        Manifest.newBuilder().setSchema(1).setHaVersion("2025.6").addEntities(entity).build();
+
     var prev =
-        new LockFile(
-            1,
-            "hash",
-            "2025-01-01T00:00:00Z",
-            java.util.Map.of("light.kitchen", "stable:deadbeefcafe"),
-            java.util.Map.of(),
-            null);
+        LockFile.newBuilder()
+            .setSchema(1)
+            .setManifestHash("hash")
+            .setGeneratedAt("2025-01-01T00:00:00Z")
+            .putEntityMap("light.kitchen", "stable:deadbeefcafe")
+            .build();
 
     var lock = LockBuilder.build(manifest, prev, Instant.parse("2025-08-14T00:00:00Z"));
 
-    assertThat(lock.entity_map()).containsEntry("light.kitchen", "stable:deadbeefcafe");
+    assertThat(lock.getEntityMapMap()).containsEntry("light.kitchen", "stable:deadbeefcafe");
   }
 
   @Test
   void derives_stable_id_from_entity_id_when_no_previous() {
-    var entity = new Entity(null, "sensor.outdoor_temp", "sensor", null, null, null);
-    var manifest = new Manifest(1, "2025.6", List.of(entity), List.of());
+    var entity = Entity.newBuilder().setEntityId("sensor.outdoor_temp").setDomain("sensor").build();
+    var manifest =
+        Manifest.newBuilder().setSchema(1).setHaVersion("2025.6").addEntities(entity).build();
+
     var lock = LockBuilder.build(manifest, null, Instant.parse("2025-08-14T00:00:00Z"));
-    // Check shape, not exact hex (algorithm detail)
-    assertThat(lock.entity_map().get("sensor.outdoor_temp")).startsWith("stable:");
+
+    assertThat(lock.getEntityMapMap().get("sensor.outdoor_temp")).startsWith("stable:");
   }
 }
