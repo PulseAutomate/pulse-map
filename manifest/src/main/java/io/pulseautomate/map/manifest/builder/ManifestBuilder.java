@@ -2,14 +2,13 @@ package io.pulseautomate.map.manifest.builder;
 
 import static io.pulseautomate.map.manifest.util.Constants.MANIFEST_SCHEMA_V1;
 
-import io.pulseautomate.map.ha.model.HAService;
 import io.pulseautomate.map.ha.model.HASnapshot;
-import io.pulseautomate.map.ha.model.HAState;
+import io.pulseautomate.map.manifest.gen.model.Entity;
+import io.pulseautomate.map.manifest.gen.model.Manifest;
+import io.pulseautomate.map.manifest.gen.model.Service;
+import io.pulseautomate.map.manifest.gen.model.ServiceField;
 import io.pulseautomate.map.manifest.infer.RuleRegistry;
-import io.pulseautomate.map.manifest.model.*;
 import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
 
 public final class ManifestBuilder {
   private final RuleRegistry rules;
@@ -23,46 +22,55 @@ public final class ManifestBuilder {
   }
 
   public Manifest build(String haVersion, HASnapshot snapshot) {
-    Objects.requireNonNull(haVersion);
-    Objects.requireNonNull(snapshot);
+    var mb = Manifest.newBuilder().setSchema(MANIFEST_SCHEMA_V1).setHaVersion(haVersion);
 
-    var entities = snapshot.states().stream().map(this::entityFromState).toList();
+    snapshot
+        .states()
+        .forEach(
+            state -> {
+              var eb =
+                  Entity.newBuilder()
+                      .setEntityId(state.entityId())
+                      .setDomain(domainOf(state.entityId()));
+              var dc = state.attributes().get("device_class");
+              if (dc != null) eb.setDeviceClass(dc.toString());
 
-    var services = snapshot.services().stream().map(this::serviceFromHA).toList();
+              var set = rules.forDomain(eb.getDomain());
+              if (set != null) {
+                var attrs = set.infer(state);
+                if (attrs != null) eb.putAllAttributes(attrs);
+              }
+              mb.addEntities(eb);
+            });
 
-    return new Manifest(MANIFEST_SCHEMA_V1, haVersion, entities, services);
-  }
+    snapshot
+        .services()
+        .forEach(
+            hs -> {
+              var sb = Service.newBuilder().setDomain(hs.domain()).setService(hs.service());
 
-  private Entity entityFromState(HAState state) {
-    var domain = domainOf(state.entityId());
-    var set = rules.forDomain(domain);
-    Map<String, AttributeDesc> attrs = set != null ? set.infer(state) : null;
+              var initialFields = new LinkedHashMap<String, ServiceField>();
+              if (hs.fields() != null && !hs.fields().isEmpty()) {
+                hs.fields()
+                    .forEach(
+                        (name, f) -> {
+                          var fb = ServiceField.newBuilder().setRequired(f.required());
+                          initialFields.put(name, fb.build());
+                        });
+              }
 
-    return new Entity(
-        null, state.entityId(), domain, str(state.attributes().get("device_class")), null, attrs);
-  }
+              var typedFields = ServiceTyping.apply(hs, initialFields);
 
-  private Service serviceFromHA(HAService hs) {
-    Map<String, ServiceField> fields;
+              if (typedFields != null) sb.putAllFields(typedFields);
 
-    if (hs.fields() != null && !hs.fields().isEmpty()) {
-      fields = new LinkedHashMap<>();
-      hs.fields()
-          .forEach((name, f) -> fields.put(name, new ServiceField(null, null, f.required())));
-    } else {
-      fields = null;
-    }
+              mb.addServices(sb);
+            });
 
-    var typedFields = ServiceTyping.apply(hs, fields);
-    return new Service(hs.domain(), hs.service(), typedFields);
+    return mb.build();
   }
 
   private static String domainOf(String entityId) {
     var i = entityId.indexOf(".");
     return i > 0 ? entityId.substring(0, i) : entityId;
-  }
-
-  private static String str(Object o) {
-    return o == null ? null : o.toString();
   }
 }

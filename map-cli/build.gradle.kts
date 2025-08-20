@@ -112,3 +112,24 @@ tasks.register<JavaExec>("recordAgentDemo") {
     jvmArgs("-agentlib:native-image-agent=config-output-dir=${agentOutMain.get().asFile.absolutePath}")
     args("discover", "--out", "../temp/pulse-map", "--demo")
 }
+
+tasks.register<JavaExec>("recordAgentValidate") {
+    group = "native"
+    description = "Run CLI validate with Graal agent to record Jackson reflection config"
+
+    mainClass = "io.pulseautomate.map.cli.MapCli"
+    classpath = sourceSets["main"].runtimeClasspath
+
+    // Use GraalVM JDK to load the agent
+    javaLauncher = toolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+        vendor = JvmVendorSpec.GRAAL_VM
+    }
+
+    // Point agent to the same dir you already include in graalvmNative.configurationFileDirectories
+    jvmArgs("-agentlib:native-image-agent=config-output-dir=${agentOutMain.get().asFile.absolutePath}")
+
+    // Validate the demo output recorded by recordAgentDemo
+    args("validate", "--dir", "../temp/pulse-map")
+}
+
