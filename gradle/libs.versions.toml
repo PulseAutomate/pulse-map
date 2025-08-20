@@ -1,21 +1,18 @@
-# gradle/libs.versions.toml
-
 [versions]
+# Core Dependencies
 junit = "5.10.2"
 picocli = "4.7.6"
-jackson = "2.17.1"
-javapoet = "1.13.0"
-protobuf = "3.25.3"
-grpc = "1.62.2"
+protobuf = "4.28.2"
 assertj = "3.26.0"
 mockwebserver = "4.12.0"
 json = "20240303"
 
-# Plugins
+# Gradle Plugins
 spotless = "6.25.0"
-protobuf-plugin = "0.9.4"
-graalvm-native = "0.10.3"
-versions-plugin = "0.51.0"
+protobufPlugin = "0.9.4"
+graalvmNative = "0.10.2"
+versionsPlugin = "0.51.0"
+shadow = "8.1.1"
 
 [libraries]
 # CLI
@@ -27,27 +24,18 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "mockwebserver" }
 
-# JSON serde
-jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson" }
-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
-jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "jackson" }
+# JSON (Reflection-Free)
 json = { module = "org.json:json", version.ref = "json" }
 
-# Codegen
-javapoet = { module = "com.squareup:javapoet", version.ref = "javapoet" }
-
-# Protobuf & gRPC (for later milestones)
+# Protobuf
 protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
-grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
-grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
-grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "grpc" }
+protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
+protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
 
-[bundles]
-jackson = ["jackson-core", "jackson-databind", "jackson-annotations"]
-grpc = ["grpc-stub", "grpc-protobuf", "grpc-netty"]
 
 [plugins]
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
-protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
-graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm-native" }
-versions = { id = "com.github.ben-manes.versions", version.ref = "versions-plugin" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
+graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvmNative" }
+versions = { id = "com.github.ben-manes.versions", version.ref = "versionsPlugin" }
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
