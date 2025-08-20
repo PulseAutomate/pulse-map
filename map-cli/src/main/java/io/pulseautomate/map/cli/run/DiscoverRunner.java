@@ -93,7 +93,11 @@ public final class DiscoverRunner {
     var lockPath = outDir.resolve("map.lock" + lockExt);
 
     if (jsonOutput) {
-      var printer = JsonFormat.printer().preservingProtoFieldNames().includingDefaultValueFields();
+      var printer =
+          JsonFormat.printer()
+              .preservingProtoFieldNames()
+              .sortingMapKeys()
+              .alwaysPrintFieldsWithNoPresence();
       Files.writeString(manifestPath, printer.print(canon));
       Files.writeString(lockPath, printer.print(lock));
     } else {
