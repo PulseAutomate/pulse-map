@@ -61,6 +61,10 @@ public final class AttributeRules {
         if (min != null) cap.setMin(Temperature.fToC(min));
         if (max != null) cap.setMax(Temperature.fToC(max));
         cap.setStep(step * (5.0 / 9.0));
+      } else {
+        if (min != null) cap.setMin(min);
+        if (max != null) cap.setMax(max);
+        cap.setStep(step);
       }
 
       return Optional.of(

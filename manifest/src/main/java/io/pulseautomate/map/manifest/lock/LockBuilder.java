@@ -28,7 +28,6 @@ public final class LockBuilder {
 
     Map<String, String> prevEntityMap = (previous != null) ? previous.getEntityMapMap() : Map.of();
 
-
     for (var e : canon.getEntitiesList()) {
       var stable = e.getStableId();
       if (stable.isBlank()) stable = prevEntityMap.get(e.getEntityId());
