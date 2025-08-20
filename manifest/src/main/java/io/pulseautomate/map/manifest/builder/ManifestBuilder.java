@@ -2,14 +2,14 @@ package io.pulseautomate.map.manifest.builder;
 
 import static io.pulseautomate.map.manifest.util.Constants.MANIFEST_SCHEMA_V1;
 
-import io.pulseautomate.map.ha.model.HAService;
-import io.pulseautomate.map.ha.model.HASnapshot;
-import io.pulseautomate.map.ha.model.HAState;
+import io.pulseautomate.map.manifest.gen.model.Entity;
+import io.pulseautomate.map.manifest.gen.model.Manifest;
+import io.pulseautomate.map.manifest.gen.model.Service;
+import io.pulseautomate.map.manifest.gen.model.ServiceField;
 import io.pulseautomate.map.manifest.infer.RuleRegistry;
-import io.pulseautomate.map.manifest.model.*;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 public final class ManifestBuilder {
   private final RuleRegistry rules;
@@ -22,47 +22,68 @@ public final class ManifestBuilder {
     this.rules = rules;
   }
 
-  public Manifest build(String haVersion, HASnapshot snapshot) {
-    Objects.requireNonNull(haVersion);
-    Objects.requireNonNull(snapshot);
+  public Manifest build(
+      String haVersion, List<Map<String, Object>> states, List<Map<String, Object>> services) {
+    var mb = Manifest.newBuilder().setSchema(MANIFEST_SCHEMA_V1).setHaVersion(haVersion);
 
-    var entities = snapshot.states().stream().map(this::entityFromState).toList();
+    states.forEach(
+        stateMap -> {
+          var state = MapHAState.from(stateMap);
+          var eb =
+              Entity.newBuilder()
+                  .setEntityId(state.entityId())
+                  .setDomain(domainOf(state.entityId()));
 
-    var services = snapshot.services().stream().map(this::serviceFromHA).toList();
+          var dc = state.attributes().get("device_class");
+          if (dc != null) eb.setDeviceClass(dc.toString());
 
-    return new Manifest(MANIFEST_SCHEMA_V1, haVersion, entities, services);
-  }
+          var set = rules.forDomain(eb.getDomain());
+          if (set != null) {
+            var attrs = set.infer(state);
+            if (attrs != null) eb.putAllAttributes(attrs);
+          }
 
-  private Entity entityFromState(HAState state) {
-    var domain = domainOf(state.entityId());
-    var set = rules.forDomain(domain);
-    Map<String, AttributeDesc> attrs = set != null ? set.infer(state) : null;
+          mb.addEntities(eb);
+        });
 
-    return new Entity(
-        null, state.entityId(), domain, str(state.attributes().get("device_class")), null, attrs);
-  }
+    services.forEach(
+        serviceDomainMap -> {
+          var domain = (String) serviceDomainMap.get("domain");
+          @SuppressWarnings("unchecked")
+          var serviceDetails = (Map<String, Object>) serviceDomainMap.get("services");
 
-  private Service serviceFromHA(HAService hs) {
-    Map<String, ServiceField> fields;
+          if (domain == null || serviceDetails == null) return;
 
-    if (hs.fields() != null && !hs.fields().isEmpty()) {
-      fields = new LinkedHashMap<>();
-      hs.fields()
-          .forEach((name, f) -> fields.put(name, new ServiceField(null, null, f.required())));
-    } else {
-      fields = null;
-    }
+          serviceDetails.forEach(
+              (serviceName, serviceData) -> {
+                var sb = Service.newBuilder().setDomain(domain).setService(serviceName);
+                @SuppressWarnings("unchecked")
+                var serviceDataMap = (Map<String, Object>) serviceData;
+                @SuppressWarnings("unchecked")
+                var fieldsMap = (Map<String, Map<String, Object>>) serviceDataMap.get("fields");
 
-    var typedFields = ServiceTyping.apply(hs, fields);
-    return new Service(hs.domain(), hs.service(), typedFields);
+                var initialFields = new LinkedHashMap<String, ServiceField>();
+                if (fieldsMap != null) {
+                  fieldsMap.forEach(
+                      (fieldName, fieldData) -> {
+                        var required = (boolean) fieldData.getOrDefault("required", false);
+                        initialFields.put(
+                            fieldName, ServiceField.newBuilder().setRequired(required).build());
+                      });
+                }
+
+                var typedFields = ServiceTyping.apply(domain, serviceName, initialFields);
+                if (typedFields != null) sb.putAllFields(typedFields);
+
+                mb.addServices(sb);
+              });
+        });
+
+    return mb.build();
   }
 
   private static String domainOf(String entityId) {
     var i = entityId.indexOf(".");
     return i > 0 ? entityId.substring(0, i) : entityId;
-  }
-
-  private static String str(Object o) {
-    return o == null ? null : o.toString();
   }
 }

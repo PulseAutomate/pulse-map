@@ -1,6 +1,6 @@
 package io.pulseautomate.map.manifest.serde;
 
-import io.pulseautomate.map.manifest.model.*;
+import io.pulseautomate.map.manifest.gen.model.*;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,44 +11,59 @@ public final class ManifestCanonicalizer {
 
   public static Manifest canonicalize(Manifest m) {
     var entities =
-        m.entities().stream()
+        m.getEntitiesList().stream()
             .sorted(
-                Comparator.comparing(Entity::stable_id, Comparator.nullsLast(String::compareTo)))
+                Comparator.comparing(Entity::getStableId, Comparator.nullsLast(String::compareTo)))
             .map(ManifestCanonicalizer::canonEntity)
             .toList();
 
     var services =
-        m.services().stream()
-            .sorted(Comparator.comparing(Service::domain).thenComparing(Service::service))
+        m.getServicesList().stream()
+            .sorted(Comparator.comparing(Service::getDomain).thenComparing(Service::getService))
             .map(ManifestCanonicalizer::canonService)
             .toList();
 
-    return new Manifest(m.schema(), m.ha_version(), entities, services);
+    return Manifest.newBuilder()
+        .setSchema(m.getSchema())
+        .setHaVersion(m.getHaVersion())
+        .addAllEntities(entities)
+        .addAllServices(services)
+        .build();
   }
 
   private static Entity canonEntity(Entity e) {
     Map<String, AttributeDesc> attrs = null;
-    if (e.attributes() != null)
+    if (!e.getAttributesMap().isEmpty())
       attrs =
-          e.attributes().entrySet().stream()
+          e.getAttributesMap().entrySet().stream()
               .sorted(Map.Entry.comparingByKey())
               .collect(
                   Collectors.toMap(
                       Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
 
-    return new Entity(e.stable_id(), e.entity_id(), e.domain(), e.device_class(), e.area(), attrs);
+    var newEntity =
+        Entity.newBuilder()
+            .setStableId(e.getStableId())
+            .setEntityId(e.getEntityId())
+            .setDomain(e.getDomain())
+            .setDeviceClass(e.getDeviceClass())
+            .setArea(e.getArea());
+    if (attrs != null) newEntity.putAllAttributes(attrs);
+    return newEntity.build();
   }
 
   private static Service canonService(Service s) {
     Map<String, ServiceField> fields = null;
-    if (s.fields() != null)
+    if (!s.getFieldsMap().isEmpty())
       fields =
-          s.fields().entrySet().stream()
+          s.getFieldsMap().entrySet().stream()
               .sorted(Map.Entry.comparingByKey())
               .collect(
                   Collectors.toMap(
                       Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
 
-    return new Service(s.domain(), s.service(), fields);
+    var newService = Service.newBuilder().setDomain(s.getDomain()).setService(s.getService());
+    if (fields != null) newService.putAllFields(fields);
+    return newService.build();
   }
 }

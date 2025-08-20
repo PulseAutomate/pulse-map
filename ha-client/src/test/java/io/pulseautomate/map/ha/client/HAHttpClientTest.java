@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import io.pulseautomate.map.ha.config.HAConfig;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.Test;
@@ -30,9 +31,14 @@ class HAHttpClientTest {
               URI.create(server.url("/").toString()), "TOKEN", java.time.Duration.ofSeconds(2), 0);
       var client = new HAHttpClient(cfg);
       var states = client.fetchStates();
+
       assertThat(states).hasSize(1);
-      assertThat(states.getFirst().entityId()).isEqualTo("light.living_room");
-      assertThat(states.getFirst().attributes()).containsEntry("brightness", 180);
+      var firstState = states.getFirst();
+      assertThat(firstState.get("entity_id")).isEqualTo("light.living_room");
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> attributes = (Map<String, Object>) firstState.get("attributes");
+      assertThat(attributes).containsEntry("brightness", 180);
     }
   }
 
@@ -47,12 +53,22 @@ class HAHttpClientTest {
               URI.create(server.url("/").toString()), "TOKEN", java.time.Duration.ofSeconds(2), 0);
       var client = new HAHttpClient(cfg);
       var services = client.fetchServices();
+
       assertThat(services).hasSize(1);
-      var s = services.getFirst();
-      assertThat(s.domain()).isEqualTo("light");
-      assertThat(s.service()).isEqualTo("turn_on");
-      assertThat(s.fields()).containsKey("brightness_pct");
-      assertThat(s.fields().get("brightness_pct").required()).isFalse();
+      var firstServiceDomain = services.getFirst();
+      assertThat(firstServiceDomain.get("domain")).isEqualTo("light");
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> serviceDetails = (Map<String, Object>) firstServiceDomain.get("services");
+      assertThat(serviceDetails).containsKey("turn_on");
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> turnOnService = (Map<String, Object>) serviceDetails.get("turn_on");
+      @SuppressWarnings("unchecked")
+      Map<String, Object> fields = (Map<String, Object>) turnOnService.get("fields");
+      @SuppressWarnings("unchecked")
+      Map<String, Object> brightnessField = (Map<String, Object>) fields.get("brightness_pct");
+      assertThat(brightnessField.get("required")).isEqualTo(false);
     }
   }
 

@@ -1,6 +1,6 @@
 package io.pulseautomate.map.cli.commands;
 
-import io.pulseautomate.map.manifest.serde.ManifestJson;
+import io.pulseautomate.map.manifest.serde.ManifestPb;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
@@ -9,14 +9,13 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "stats",
     mixinStandardHelpOptions = true,
-    description =
-        "Print quick stats for a manifest.json (per-domain counts and attribute coverage).")
+    description = "Print quick stats for a manifest.pb (per-domain counts and attribute coverage).")
 public final class StatsCommand implements Callable<Integer> {
   @CommandLine.Option(
       names = {"--manifest"},
-      description = "Path to manifest.json file.",
+      description = "Path to manifest.pb file.",
       paramLabel = "<file>",
-      defaultValue = "manifest.json")
+      defaultValue = "manifest.pb")
   Path manifestPath;
 
   @CommandLine.Option(
@@ -28,23 +27,19 @@ public final class StatsCommand implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
-    var manifest = ManifestJson.read(manifestPath);
+    var manifest = ManifestPb.read(manifestPath);
     var domainCounts = new HashMap<String, Integer>();
     var attrCounts = new HashMap<String, Integer>();
 
-    if (manifest.entities() != null) {
-      for (var e : manifest.entities()) {
-        domainCounts.merge(e.domain(), 1, Integer::sum);
-        if (e.attributes() != null) {
-          for (var a : e.attributes().keySet()) {
-            attrCounts.merge(e.domain() + "." + a, 1, Integer::sum);
-          }
-        }
+    for (var e : manifest.getEntitiesList()) {
+      domainCounts.merge(e.getDomain(), 1, Integer::sum);
+      for (var a : e.getAttributesMap().keySet()) {
+        attrCounts.merge(e.getDomain() + "." + a, 1, Integer::sum);
       }
     }
 
-    var totalEntities = manifest.entities() == null ? 0 : manifest.entities().size();
-    var totalServices = manifest.services() == null ? 0 : manifest.services().size();
+    var totalEntities = manifest.getEntitiesCount();
+    var totalServices = manifest.getServicesCount();
 
     System.out.println("Entities: " + totalEntities + " Services: " + totalServices);
 

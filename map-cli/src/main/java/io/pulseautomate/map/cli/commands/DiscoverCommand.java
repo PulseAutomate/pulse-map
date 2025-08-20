@@ -9,13 +9,12 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "discover",
     mixinStandardHelpOptions = true,
-    description =
-        "Discover from Home Assistant (or demo) and write manifest.json and map.lock.json")
+    description = "Discover from Home Assistant (or demo) and write manifest.pb and map.lock.pb")
 public final class DiscoverCommand implements Callable<Integer> {
   @CommandLine.Option(
       names = {"--out"},
       paramLabel = "<dir>",
-      description = "Output directory for manifest.json and map.lock.json",
+      description = "Output directory for manifest.pb and map.lock.pb",
       required = true)
   Path outDir;
 
@@ -47,6 +46,11 @@ public final class DiscoverCommand implements Callable<Integer> {
       description = "Enable verbose output (default: false)")
   boolean verbose;
 
+  @CommandLine.Option(
+      names = {"--json"},
+      description = "Output files in human-readable JSON format (default: false)")
+  boolean jsonOutput;
+
   static DiscoverRunner.Factory factory = DiscoverRunner::forHomeAssistant;
 
   @Override
@@ -72,10 +76,12 @@ public final class DiscoverCommand implements Callable<Integer> {
               + " haUrl="
               + (url == null ? "(none)" : url)
               + " haVersion="
-              + (version == null ? "(none)" : version));
+              + (version == null ? "(none)" : version)
+              + " format="
+              + (jsonOutput ? "json" : "protobuf"));
     }
 
-    var res = runner.run(outDir);
+    var res = runner.run(outDir, jsonOutput);
 
     System.out.printf("Wrote:%n %s%n %s%n", res.manifestPath(), res.lockPath());
     System.out.printf("Entities: %d, Services: %d%n", res.entities(), res.services());

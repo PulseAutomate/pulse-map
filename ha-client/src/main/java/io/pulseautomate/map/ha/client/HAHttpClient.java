@@ -1,23 +1,17 @@
 package io.pulseautomate.map.ha.client;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.pulseautomate.map.ha.config.HAConfig;
-import io.pulseautomate.map.ha.model.HAService;
-import io.pulseautomate.map.ha.model.HAServiceField;
-import io.pulseautomate.map.ha.model.HAState;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import org.json.JSONArray;
 
 public final class HAHttpClient implements HAClient {
-  private static final ObjectMapper MAPPER =
-      new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
   private final HAConfig cfg;
   private final HttpClient http;
@@ -32,46 +26,20 @@ public final class HAHttpClient implements HAClient {
   }
 
   @Override
-  public List<HAState> fetchStates() throws HAHttpException {
-    return getJson("/api/states", new TypeReference<>() {});
+  public List<Map<String, Object>> fetchStates() throws HAHttpException {
+    var jsonBody = getJsonString("/api/states");
+    var jsonArray = new JSONArray(jsonBody);
+    return jsonArray.toList().stream().map(item -> (Map<String, Object>) item).toList();
   }
 
   @Override
-  public List<HAService> fetchServices() throws HAHttpException {
-    var raw = getJson("/api/services", new TypeReference<List<Map<String, Object>>>() {});
-    List<HAService> out = new ArrayList<>();
-
-    for (var item : raw) {
-      var domain = Objects.toString(item.get("domain"), null);
-      @SuppressWarnings("unchecked")
-      var services = (Map<String, Object>) item.get("services");
-
-      if (domain == null || services == null) continue;
-
-      for (Map.Entry<String, Object> e : services.entrySet()) {
-        var service = e.getKey();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> svc = (Map<String, Object>) e.getValue();
-        @SuppressWarnings("unchecked")
-        Map<String, Map<String, Object>> fieldsRaw =
-            (Map<String, Map<String, Object>>) svc.get("fields");
-
-        Map<String, HAServiceField> fields = new LinkedHashMap<>();
-        if (fieldsRaw != null) {
-          for (var fe : fieldsRaw.entrySet()) {
-            var node = fe.getValue();
-            HAServiceField f = MAPPER.convertValue(node, HAServiceField.class);
-            fields.put(fe.getKey(), f);
-          }
-        }
-
-        out.add(new HAService(domain, service, fields));
-      }
-    }
-    return out;
+  public List<Map<String, Object>> fetchServices() throws HAHttpException {
+    var jsonBody = getJsonString("/api/services");
+    var jsonArray = new JSONArray(jsonBody);
+    return jsonArray.toList().stream().map(item -> (Map<String, Object>) item).toList();
   }
 
-  private <T> T getJson(String path, TypeReference<T> type) throws HAHttpException {
+  private String getJsonString(String path) throws HAHttpException {
     final var uri = resolve(path);
     var attempts = 0;
     HAHttpException last = null;
@@ -91,7 +59,7 @@ public final class HAHttpClient implements HAClient {
         var code = res.statusCode();
         var body = res.body();
 
-        if (code >= 200 && code < 300) return MAPPER.readValue(body, type);
+        if (code >= 200 && code < 300) return body;
 
         if (isTransient(code))
           last = new HAHttpException("Transient HTTP " + code, code, uri.toString(), body);
