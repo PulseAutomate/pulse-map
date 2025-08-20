@@ -107,14 +107,11 @@ public final class AttributeRules {
       cap.setMin(min);
       if (max != null) cap.setMax(max);
 
-      return Optional.of(
-          Map.entry(
-              canonicalName,
-              AttributeDesc.newBuilder()
-                  .setKind(FieldKind.NUMBER)
-                  .setUnit(unit)
-                  .setCaps(cap)
-                  .build()));
+      var desc = AttributeDesc.newBuilder().setKind(FieldKind.NUMBER).setCaps(cap);
+
+      if (unit != null) desc.setUnit(unit);
+
+      return Optional.of(Map.entry(canonicalName, desc.build()));
     };
   }
 
