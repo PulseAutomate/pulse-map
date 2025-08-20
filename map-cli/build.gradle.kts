@@ -20,7 +20,7 @@ dependencies {
     implementation(project(":manifest"))
 
     implementation(libs.picocli)
-    implementation(libs.bundles.jackson)
+    implementation(libs.protobuf.java.util)
 
     annotationProcessor(libs.picocli.codegen)
 

@@ -36,8 +36,9 @@ json = { module = "org.json:json", version.ref = "json" }
 # Codegen
 javapoet = { module = "com.squareup:javapoet", version.ref = "javapoet" }
 
-# Protobuf & gRPC (for later milestones)
+# Protobuf & gRPC
 protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
 grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
 grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
 grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "grpc" }
