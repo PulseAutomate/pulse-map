@@ -1,9 +1,8 @@
 plugins {
     application
     alias(libs.plugins.versions)
-
-    id("com.github.johnrengelman.shadow") version "8.1.1"
-    id("org.graalvm.buildtools.native") version "0.10.2"
+    alias(libs.plugins.shadow)
+    alias(libs.plugins.graalvm.native)
 }
 
 repositories {
