@@ -1,5 +1,5 @@
 dependencies {
-    implementation(libs.bundles.jackson)
+    implementation(libs.json)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
