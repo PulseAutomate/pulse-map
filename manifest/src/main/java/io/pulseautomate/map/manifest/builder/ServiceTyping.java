@@ -5,7 +5,6 @@ import static io.pulseautomate.map.manifest.util.Names.Domain.*;
 import static io.pulseautomate.map.manifest.util.Names.SvcField.*;
 import static io.pulseautomate.map.manifest.util.Names.SvcField.KELVIN;
 
-import io.pulseautomate.map.ha.model.HAService;
 import io.pulseautomate.map.manifest.gen.model.ServiceField;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,13 +13,11 @@ import java.util.Objects;
 public final class ServiceTyping {
   private ServiceTyping() {}
 
-  static Map<String, ServiceField> apply(HAService svc, Map<String, ServiceField> in) {
+  static Map<String, ServiceField> apply(
+      String domain, String serviceName, Map<String, ServiceField> in) {
     if (in == null || in.isEmpty()) return in;
-    var d = svc.domain();
-    var s = svc.service();
-
     var out = new LinkedHashMap<String, ServiceField>(in.size());
-    in.forEach((name, f) -> out.put(name, typed(d, s, name, f)));
+    in.forEach((name, f) -> out.put(name, typed(domain, serviceName, name, f)));
     return out;
   }
 
