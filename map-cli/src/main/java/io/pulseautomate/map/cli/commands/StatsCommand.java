@@ -13,7 +13,7 @@ import picocli.CommandLine;
 public final class StatsCommand implements Callable<Integer> {
   @CommandLine.Option(
       names = {"--manifest"},
-      description = "Path to manifest.json file.",
+      description = "Path to manifest.pb file.",
       paramLabel = "<file>",
       defaultValue = "manifest.pb")
   Path manifestPath;
