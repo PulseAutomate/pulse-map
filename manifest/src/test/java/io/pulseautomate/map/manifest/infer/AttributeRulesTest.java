@@ -4,7 +4,7 @@ import static io.pulseautomate.map.manifest.util.Names.Attr.*;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.*;
 import static org.assertj.core.api.Assertions.*;
 
-import io.pulseautomate.map.ha.model.HAState;
+import io.pulseautomate.map.manifest.builder.MapHAState;
 import io.pulseautomate.map.manifest.gen.model.AttributeDesc;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,7 +19,7 @@ class AttributeRulesTest {
     attrs.put(MAX_MIREDS, 500); // common max (2000 K)
     attrs.put(SUPPORTED_COLOR_MODES, List.of("color_temp"));
 
-    var state = new HAState("light.any", "on", attrs, null, null);
+    var state = new MapHAState("light.any", attrs);
 
     var rule = AttributeRules.colorTempKelvinFromMireds(COLOR_TEMP_K, MIN_MIREDS, MAX_MIREDS);
     var entry = rule.infer(state).orElseThrow();
@@ -37,7 +37,7 @@ class AttributeRulesTest {
   void hs_color_rules_present_when_supported_color_modes_contains_hs() {
     var attrs = new LinkedHashMap<String, Object>();
     attrs.put(SUPPORTED_COLOR_MODES, List.of("hs"));
-    var state = new HAState("light.rgb", "on", attrs, null, null);
+    var state = new MapHAState("light.rgb", attrs);
 
     var hueRule =
         AttributeRules.presentIf(

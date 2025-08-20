@@ -3,7 +3,7 @@ package io.pulseautomate.map.manifest.infer;
 import static io.pulseautomate.map.manifest.util.Constants.*;
 import static io.pulseautomate.map.manifest.util.Names.HaAttr.SUPPORTED_COLOR_MODES;
 
-import io.pulseautomate.map.ha.model.HAState;
+import io.pulseautomate.map.manifest.builder.MapHAState;
 import io.pulseautomate.map.manifest.gen.model.AttributeDesc;
 import io.pulseautomate.map.manifest.gen.model.CapabilityRange;
 import io.pulseautomate.map.manifest.gen.model.FieldKind;
@@ -144,7 +144,7 @@ public final class AttributeRules {
     };
   }
 
-  public static AttributeRule presentIf(AttributeRule base, Predicate<HAState> pred) {
+  public static AttributeRule presentIf(AttributeRule base, Predicate<MapHAState> pred) {
     return state -> pred.test(state) ? base.infer(state) : Optional.empty();
   }
 
@@ -203,7 +203,7 @@ public final class AttributeRules {
     return percentPct(canonicalName);
   }
 
-  public static Predicate<HAState> colorModeIncludes(String mode) {
+  public static Predicate<MapHAState> colorModeIncludes(String mode) {
     return state -> {
       var o = state.attributes().get(SUPPORTED_COLOR_MODES);
       if (!(o instanceof List<?> list)) return false;
