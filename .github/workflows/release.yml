@@ -1,16 +1,15 @@
 # .github/workflows/release.yml
-# This workflow creates a GitHub Release with native GraalVM executables for Linux, macOS, and Windows.
-# It triggers automatically when code is pushed to the 'main' branch.
+# This workflow creates a GitHub Release with native GraalVM executables.
+# It triggers automatically when a tag starting with 'v' is pushed.
 
 name: Create Release with GraalVM Native Binaries
 
 on:
   push:
-    branches:
-      - main # Trigger the workflow on pushes to the main branch
+    tags:
+      - 'v*'
 
 jobs:
-  # Job to build the native executable for Linux
   build-linux:
     name: Build for Linux
     runs-on: ubuntu-latest
@@ -25,26 +24,21 @@ jobs:
           graalvm-version: 'latest'
           native-image-job-reports: 'true'
 
-      # Grant execute permission for the Gradle wrapper
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Use the Gradle Build Action to enable caching
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v3
 
-      # Build the native executable for the 'map-cli' subproject
       - name: Build native executable with Gradle
         run: ./gradlew :map-cli:nativeCompile
 
-      # Upload the compiled executable as an artifact
       - name: Upload Linux executable
         uses: actions/upload-artifact@v4
         with:
           name: pulse-map-linux-amd64
-          path: map-cli/build/native/nativeCompile/map-cli
+          path: map-cli/build/native/nativeCompile/pulse-map
 
-  # Job to build the native executable for macOS
   build-macos:
     name: Build for macOS
     runs-on: macos-latest
@@ -63,7 +57,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Build native executable with Gradle
         run: ./gradlew :map-cli:nativeCompile
@@ -72,9 +66,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pulse-map-macos-amd64
-          path: map-cli/build/native/nativeCompile/map-cli
+          path: map-cli/build/native/nativeCompile/pulse-map
 
-  # Job to build the native executable for Windows
   build-windows:
     name: Build for Windows
     runs-on: windows-latest
@@ -90,9 +83,8 @@ jobs:
           native-image-job-reports: 'true'
 
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v3
 
-      # The gradlew.bat script should already be executable on Windows
       - name: Build native executable with Gradle
         run: ./gradlew.bat :map-cli:nativeCompile
 
@@ -100,62 +92,75 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pulse-map-windows-amd64.exe
-          path: map-cli/build/native/nativeCompile/map-cli.exe
+          path: map-cli/build/native/nativeCompile/pulse-map.exe
 
-  # Job to create the GitHub Release and upload the executables
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build-linux, build-macos, build-windows]
     permissions:
-      contents: write # Required to create a release
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # This step reads the version from gradle.properties, removes '-SNAPSHOT', and sets it as an environment variable
-      - name: Extract version from gradle.properties
-        id: get_version
+      - name: Validate Version Consistency
         run: |
-          version=$(grep 'version=' gradle.properties | cut -d'=' -f2 | sed 's/-SNAPSHOT//')
-          echo "VERSION=$version" >> $GITHUB_ENV
+          TAG_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          PROJECT_VERSION=$(grep 'version=' gradle.properties | cut -d'=' -f2)
+          echo "Git Tag Version: $TAG_VERSION"
+          echo "Project Version: $PROJECT_VERSION"
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "Error: Git tag version ($TAG_VERSION) does not match project version in gradle.properties ($PROJECT_VERSION)."
+            exit 1
+          fi
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Finalize Changelog
+        run: ./gradlew patchChangelog --no-daemon
+
+      - name: Commit updated changelog
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs(changelog): update for release ${{ github.ref_name }}"
+          file_pattern: CHANGELOG.md
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
 
-      # Create the release using the version from gradle.properties as the tag
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.VERSION }}
-          release_name: Release v${{ env.VERSION }}
-          body: |
-            Automated release of v${{ env.VERSION }}.
-            Contains native executables for Linux, macOS, and Windows.
-          draft: false
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          draft: true
           prerelease: false
 
-      # Upload all the downloaded binaries to the release
       - name: Upload Release Assets
-        # Use bash shell and set nullglob to prevent errors if no files are found
-        shell: bash
         run: |
-          shopt -s nullglob
-          # The download-artifact action creates a directory for each artifact.
-          # We need to go into each directory to find the binary.
           for dir in dist/*; do
             file_path=$(find "$dir" -type f)
-            if [ -n "$file_path" ]; then
-              echo "Uploading $file_path..."
-              gh release upload v${{ env.VERSION }} "$file_path" --clobber
-            fi
+            echo "Uploading $file_path..."
+            gh release upload ${{ github.ref_name }} "$file_path" --clobber
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
