@@ -1,5 +1,5 @@
 # .github/workflows/release.yml
-# This workflow creates a GitHub Release with native GraalVM executables.
+# This workflow creates a GitHub Release with native GraalVM executables for four platforms.
 # It triggers automatically when a tag starting with 'v' is pushed.
 
 name: Create Release with GraalVM Native Binaries
@@ -7,97 +7,102 @@ name: Create Release with GraalVM Native Binaries
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Trigger the workflow on pushes of tags like v0.1.0, v1.2.3-M2
 
 jobs:
-  build-linux:
-    name: Build for Linux
+  # Job to build the native executable for Linux (x86_64)
+  build-linux-amd64:
+    name: Build for Linux (x86_64)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           graalvm-version: 'latest'
-          native-image-job-reports: 'true'
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
-
-      - name: Build native executable with Gradle
+      - name: Build native executable
         run: ./gradlew :map-cli:nativeCompile
-
       - name: Upload Linux executable
         uses: actions/upload-artifact@v4
         with:
           name: pulse-map-linux-amd64
           path: map-cli/build/native/nativeCompile/pulse-map
 
-  build-macos:
-    name: Build for macOS
+  # Job to build the native executable for macOS (x86_64 / Intel)
+  build-macos-amd64:
+    name: Build for macOS (x86_64)
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           graalvm-version: 'latest'
-          native-image-job-reports: 'true'
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
-
-      - name: Build native executable with Gradle
+      - name: Build native executable
         run: ./gradlew :map-cli:nativeCompile
-
       - name: Upload macOS executable
         uses: actions/upload-artifact@v4
         with:
           name: pulse-map-macos-amd64
           path: map-cli/build/native/nativeCompile/pulse-map
 
-  build-windows:
-    name: Build for Windows
-    runs-on: windows-latest
+  # Job to build the native executable for macOS (aarch64 / Apple Silicon)
+  build-macos-arm64:
+    name: Build for macOS (aarch64)
+    runs-on: macos-14 # This runner provides an ARM64 environment
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           graalvm-version: 'latest'
-          native-image-job-reports: 'true'
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+      - name: Build native executable
+        run: ./gradlew :map-cli:nativeCompile
+      - name: Upload macOS ARM executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulse-map-macos-arm64
+          path: map-cli/build/native/nativeCompile/pulse-map
 
-      - name: Build native executable with Gradle
+  # Job to build the native executable for Windows (x86_64)
+  build-windows-amd64:
+    name: Build for Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          graalvm-version: 'latest'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Build native executable
         run: ./gradlew.bat :map-cli:nativeCompile
-
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
           name: pulse-map-windows-amd64.exe
           path: map-cli/build/native/nativeCompile/pulse-map.exe
 
+  # Job to create the GitHub Release and upload all executables
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux-amd64, build-macos-amd64, build-macos-arm64, build-windows-amd64]
     permissions:
       contents: write
     steps:
@@ -110,10 +115,8 @@ jobs:
         run: |
           TAG_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
           PROJECT_VERSION=$(grep 'version=' gradle.properties | cut -d'=' -f2)
-          echo "Git Tag Version: $TAG_VERSION"
-          echo "Project Version: $PROJECT_VERSION"
           if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
-            echo "Error: Git tag version ($TAG_VERSION) does not match project version in gradle.properties ($PROJECT_VERSION)."
+            echo "Error: Git tag ($TAG_VERSION) does not match project version in gradle.properties ($PROJECT_VERSION)."
             exit 1
           fi
 
@@ -126,11 +129,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
       - name: Finalize Changelog
-        run: ./gradlew patchChangelog --no-daemon
+        run: |
+          # Check if there are any tags before this one.
+          # If 'git describe' fails, it means this is the first tag.
+          if git describe --tags --abbrev=0 HEAD^ >/dev/null 2>&1; then
+            # Not the first tag, so generate changelog from the previous tag.
+            echo "Generating changelog from previous tag."
+            ./gradlew patchChangelog --no-daemon
+          else
+            # This is the first tag. Generate changelog from the very first commit.
+            echo "First tag detected. Generating changelog from initial commit."
+            FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+            ./gradlew patchChangelog -Pchangelog.from=$FIRST_COMMIT -Pchangelog.to=HEAD --no-daemon
+          fi
 
       - name: Commit updated changelog
         uses: stefanzweifel/git-auto-commit-action@v5
@@ -157,10 +169,12 @@ jobs:
 
       - name: Upload Release Assets
         run: |
-          for dir in dist/*; do
-            file_path=$(find "$dir" -type f)
-            echo "Uploading $file_path..."
-            gh release upload ${{ github.ref_name }} "$file_path" --clobber
-          done
+          # Rename and upload each artifact for clarity
+          mv dist/pulse-map-linux-amd64/pulse-map dist/pulse-map-linux-amd64
+          mv dist/pulse-map-macos-amd64/pulse-map dist/pulse-map-macos-amd64
+          mv dist/pulse-map-macos-arm64/pulse-map dist/pulse-map-macos-arm64
+          mv dist/pulse-map-windows-amd64.exe/pulse-map.exe dist/pulse-map-windows-amd64.exe
+          
+          gh release upload ${{ github.ref_name }} dist/* --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

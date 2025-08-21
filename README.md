@@ -8,7 +8,7 @@
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-supported-success)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-**Pulse Map** is the Home Assistant discovery & codegen tool in the **PulseAutomate** ecosystem. It connects to your HA instance, builds a stable-ID **manifest** of entities & services, and generates **Protocol Buffers** (plus optional **JVM bindings**) for language-agnostic development. The MVP includes **Mapped Attributes** and **Attribute Enums**, so you can query **what a device can do** with **typed, string-free accessors**.
+**Pulse Map** is the Home Assistant discovery and analysis tool in the **PulseAutomate** ecosystem. It connects to your HA instance and builds a stable-ID **manifest** of your entities and services. The command-line interface (CLI) allows you to discover your instance, validate your configuration's integrity, and view detailed stats about your smart home setup.
 
 > 💡 *Map discovers & describes. DSLs consume. Core executes.*
 > Map does **not** run automations; that’s **Pulse Core**.
@@ -18,271 +18,177 @@
 ## Table of Contents
 
 * [Why Pulse Map?](#why-pulse-map)
-* [How It Fits (PulseAutomate System)](#how-it-fits-pulseautomate-system)
+* [How It Fits (The PulseAutomate System)](#how-it-fits-the-pulseautomate-system)
 * [Status](#status)
-* [Features (MVP)](#features-mvp)
+* [Features (M1 Release)](#features-m1-release)
 * [Requirements](#requirements)
 * [Install](#install)
 * [Quickstart](#quickstart)
 * [CLI Usage](#cli-usage)
-* [Daemon Usage](#daemon-usage)
 * [Configuration](#configuration)
-* [Manifest Schema (v1)](#manifest-schema-v1)
-* [Generated Outputs](#generated-outputs)
+* [The Manifest & Lock File](#the-manifest--lock-file)
 * [Project Layout](#project-layout)
 * [Build From Source](#build-from-source)
-* [Development Tips (IntelliJ)](#development-tips-intellij)
 * [Roadmap](#roadmap)
-* [Versioning & Compatibility](#versioning--compatibility)
 * [Contributing](#contributing)
-* [Code of Conduct](#code-of-conduct)
-* [Security](#security)
 * [License](#license)
-* [Community & Links](#community--links)
 
 ---
 
 ## Why Pulse Map?
 
-Home Assistant entity IDs and service signatures can drift (renames, integration changes). Pulse Map:
+Home Assistant entity IDs and service signatures can drift due to renames or integration changes. Pulse Map solves this by:
 
-* Creates **stable IDs** so your code/DSL won’t break when `light.kitchen` becomes `light.kitchen_ceiling`.
-* Produces **language-agnostic** Protobuf types your DSL can codegen against.
-* Ships an always-on **daemon** to keep your dev workspace synchronized with HA.
-* (**MVP**) Adds **Mapped Attributes + Attribute Enums** to access attributes & device capabilities **without magic strings**:
+* **Creating stable IDs** so your code and automations won’t break when `light.kitchen` becomes `light.kitchen_ceiling`.
+* **Building a reproducible manifest** of your smart home's state, attributes, and services in a compact, binary format.
+* **Providing tools to validate and analyze** your configuration, helping you understand what's in your smart home and ensuring its integrity over time.
 
-    * `Attrs.climate(E.climate.LIVING_ROOM_TRV).hvacMode()` → `ClimateHvacMode` enum
-    * `Capabilities.climate(E.climate.LIVING_ROOM_TRV).targetTemperatureC()` → `{min,max,step}` for safe writes
-
-## How It Fits (PulseAutomate System)
+## How It Fits (The PulseAutomate System)
 
 ```mermaid
 flowchart LR
-    HA[Home Assistant] -- discover + watch --> Map[Pulse Map]
-    Map -- manifest.json + .proto + (JVM) --> DSLs[Language DSLs]
+    HA[Home Assistant] -- discover --> Map[Pulse Map CLI]
+    Map -- manifest.pb + map.lock.pb --> DSLs[Language DSLs]
     DSLs -- IR bundle --> Core[Pulse Core]
-    Forge[Pulse Forge] -- scaffolds + calls gRPC --> Map
-    Sandbox[Pulse Sandbox] -- simulate --> IR[IR Graphs]
-    Guard[Pulse Guard] -- lint/clamp --> IR
+    Forge[Pulse Forge] -- scaffolds --> Map
 ```
 
 **PulseAutomate** is a language-agnostic automation stack:
 
-* **Pulse Map** → discovery, typed attributes/capabilities & codegen (this repo)
-* **Pulse Core** → IR executor inside HA
-* **Pulse Forge** → project scaffolding & toolchain glue
-* **Pulse Sandbox** → simulation & testing
-* **Pulse Guard** → linting / clamps (uses device capability ranges)
-
-## Status
-
-**Pre-MVP / in active development.** Expect frequent changes while we stabilize the manifest and codegen APIs. Follow the [Milestones](../../milestones) for progress.
+* **Pulse Map** → Discovery, analysis, and manifest generation (this repo).
+* **Pulse Core** → An automation engine that runs inside Home Assistant.
+* **Pulse Forge** → Project scaffolding and toolchain management.
 
 ---
 
-## Features (MVP)
+## Status
 
-* **CLI-first** workflow (GraalVM native binary option) + optional **`mapd`** gRPC daemon
-* **Stable-ID manifest** (`manifest.json`) + reproducible **lock file** (`map.lock.json`)
-* **Protobuf codegen** for language-agnostic consumption
-* **(MVP) JVM bindings**: `Entities`, `Services`, `Attrs`, `Capabilities`, **Domain Enums**
-* **Mapped Attributes + Attribute Enums** (MVP)
+**v0.1.0-M1 is available!** This is the first milestone release, focused on providing a stable CLI for discovery, validation, and analysis of a Home Assistant instance. Follow the project's [Milestones](../../milestones) for future progress.
 
-    * Typed getters for common attributes (e.g., `hvacMode`, `targetTemperatureC`)
-    * Per-device **capabilities** (min/max/step) for clamp-safe writes
-* **Two sync modes**
+---
 
-    * **Suggestion**: stream changes; prompt tools/you to regenerate
-    * **Aggressive**: auto-regenerate on changes
+## Features (M1 Release)
+
+* **Robust CLI** built with GraalVM for native executables on Linux, macOS, and Windows.
+* **`discover` command** to connect to Home Assistant and generate a detailed manifest and lock file.
+* **`validate` command** to check the integrity of a manifest against its lock file.
+* **`stats` command** to print per-domain entity counts and attribute coverage.
+* **Stable-ID Manifest** (`manifest.pb`) and a reproducible **Lock File** (`map.lock.pb`).
+* **Attribute Inference** for common Home Assistant domains (`climate`, `light`, `fan`, `cover`, `media_player`, `number`).
+* **Protobuf binary (default)** or optional JSON output formats.
+    * **Note**: The `--json` flag is non-functional in the M1 release due to a known bug ([#42](https://github.com/PulseAutomate/pulse-map/issues/42)).
+
+---
 
 ## Requirements
 
-* **Java 21+** (Temurin/Zulu recommended)
-* Home Assistant URL + Long-Lived Access Token
-* Linux x64/aarch64 supported for native builds (JVM works cross-platform)
+* **Java 21+** (Temurin/Zulu recommended for building).
+* A running Home Assistant instance with its URL and a Long-Lived Access Token.
 
 ---
 
 ## Install
 
-**Option A — Download release binaries** (recommended)
-
-1. Go to [Releases](../../releases) and download the latest assets for your platform.
-2. Extract and place `pulse-map` (CLI) and optionally `pulse-mapd` (daemon) on your PATH.
-
-**Option B — Build from source**: see [Build From Source](#build-from-source).
+1.  Go to the [**Releases Page**](../../releases) and download the latest executable for your platform (e.g., `pulse-map-linux-amd64`).
+2.  Place the executable on your system's `PATH` and make it executable (e.g., `chmod +x pulse-map-linux-amd64`).
 
 ---
 
 ## Quickstart
 
-1. **Discover** your HA instance → `manifest.json` + `map.lock.json`
+1.  **Discover your Home Assistant instance** using the default Protobuf format.
 
-```bash
-./pulse-map discover \
-  --url http://ha.local:8123 \
-  --token $PULSE_HA_TOKEN \
-  --out ./build/pulse/manifest.json
-```
+    ```bash
+    pulse-map discover \
+      --ha-url [http://homeassistant.local:8123](http://homeassistant.local:8123) \
+      --ha-token $YOUR_HA_TOKEN \
+      --out ./config
+    ```
 
-2. **Generate Protobuf** (language-agnostic)
+2.  **View statistics** about your discovered configuration.
 
-```bash
-./pulse-map proto \
-  --manifest ./build/pulse/manifest.json \
-  --out ./build/generated/proto
-```
+    ```bash
+    pulse-map stats --manifest ./config/manifest.pb
+    ```
 
-3. **(Optional) Generate JVM bindings** with typed attributes & caps
+3.  **Validate the integrity** of your manifest and lock file.
 
-```bash
-./pulse-map java \
-  --manifest ./build/pulse/manifest.json \
-  --package com.example.home.gen \
-  --out ./build/generated/java
-```
-
-**Example (Java MVP)**
-
-```java
-// Read typed attributes (no strings)
-var mode   = Attrs.climate(E.climate.LIVING_ROOM_TRV).hvacMode();       // ClimateHvacMode enum
-var setptC = Attrs.climate(E.climate.LIVING_ROOM_TRV).targetTemperatureC(); // double or Temperature type
-
-// Safe write clamped to device capabilities
-var caps = Capabilities.climate(E.climate.LIVING_ROOM_TRV).targetTemperatureC(); // {min,max,step}
-var safe = Temperature.celsius(19.0).clamp(caps);
-call(S.climate.setTemperature(E.climate.LIVING_ROOM_TRV).temperature(safe));
-```
+    ```bash
+    pulse-map validate --dir ./config
+    ```
 
 ---
 
 ## CLI Usage
 
-```bash
-# Help
-./pulse-map --help
-./pulse-map discover --help
-./pulse-map proto --help
-./pulse-map java --help
-
-# Typical flow
-./pulse-map discover --url http://ha.local:8123 --token $PULSE_HA_TOKEN --out ./build/pulse/manifest.json
-./pulse-map proto     --manifest ./build/pulse/manifest.json --out ./build/generated/proto
-./pulse-map java      --manifest ./build/pulse/manifest.json --package com.example.home.gen --out ./build/generated/java
-```
-
-## Daemon Usage
+The `pulse-map` CLI has three main commands. You can get help for any command by using the `--help` flag.
 
 ```bash
-# Start daemon
-./pulse-mapd start \
-  --url $PULSE_HA_URL \
-  --token $PULSE_HA_TOKEN \
-  --workdir ./build/pulse
+# General help
+pulse-map --help
 
-# Choose sync mode
-./pulse-mapd mode --suggestion     # or --aggressive
-
-# Status / stop
-./pulse-mapd status
-./pulse-mapd stop
+# Help for the 'discover' command
+pulse-map discover --help
 ```
 
-**gRPC API (high level)**
+### `discover`
 
-```proto
-service MapService {
-  rpc Discover(DiscoverRequest) returns (DiscoverReply);
-  rpc GenerateProto(GenRequest) returns (GenReply);
-  rpc GenerateJvm(GenJvmRequest) returns (GenReply);
-  rpc Watch(WatchRequest) returns (stream WatchEvent);
-  rpc SetMode(SetModeRequest) returns (StatusReply);
-  rpc Status(google.protobuf.Empty) returns (StatusReply);
-}
+Connects to Home Assistant and generates `manifest.pb` and `map.lock.pb` files.
+
+```bash
+# Discover and output to a 'build/pulse' directory
+pulse-map discover --out ./build/pulse
+
+# Use the --json flag for human-readable output instead of binary
+# NOTE: This flag is non-functional in v0.1.0-M1. See issue #42.
+pulse-map discover --out ./build/pulse --json
+
+# Use the built-in demo data instead of connecting to a real HA instance
+pulse-map discover --out ./build/pulse --demo
+```
+
+### `validate`
+
+Checks that a `manifest.pb` file is in sync with its corresponding `map.lock.pb` file.
+
+```bash
+# Validate the files in the current directory
+pulse-map validate
+
+# Validate files in a specific directory with strict error checking
+pulse-map validate --dir ./build/pulse --strict
+```
+
+### `stats`
+
+Prints high-level statistics about the entities and services in a `manifest.pb` file.
+
+```bash
+# Show stats for a manifest file, showing the top 5 domains
+pulse-map stats --manifest ./build/pulse/manifest.pb --top 5
 ```
 
 ---
 
 ## Configuration
 
-Environment variables are optional but convenient:
+For convenience, you can set environment variables instead of passing CLI flags. The `discover` command will use these as fallbacks.
 
-* `PULSE_HA_URL` — Home Assistant base URL (e.g. `http://ha.local:8123`)
-* `PULSE_HA_TOKEN` — Home Assistant Long-Lived Access Token
-* `PULSE_WORKDIR` — Default working directory for manifest/lock/codegen outputs
+* `HA_URL` — Your Home Assistant base URL (e.g., `http://homeassistant.local:8123`).
+* `HA_TOKEN` — Your Home Assistant Long-Lived Access Token.
+* `HA_VERSION` — An optional version string to embed in the manifest.
 
-CLI flags override environment variables.
-
----
-
-## Manifest Schema (v1)
-
-**`manifest.json` (excerpt):**
-
-```json
-{
-  "schema": 1,
-  "ha_version": "2025.6",
-  "entities": [
-    {
-      "stable_id": "stable:aa12…",
-      "entity_id": "climate.living_room_trv",
-      "domain": "climate",
-      "device_class": "heater",
-      "attributes": {
-        "hvac_mode":     { "kind": "enum",   "enum": ["off","heat","auto"] },
-        "preset_mode":   { "kind": "enum",   "enum": ["eco","comfort"], "optional": true },
-        "current_temp_c":{ "kind": "number", "unit": "°C" },
-        "target_temp_c": { "kind": "number", "unit": "°C",
-                             "caps": { "min": 5.0, "max": 30.0, "step": 0.5 } }
-      }
-    }
-  ],
-  "services": [
-    {
-      "domain": "climate",
-      "service": "set_temperature",
-      "fields": {
-        "temperature": { "type": "number", "unit": "°C", "required": true }
-      }
-    }
-  ]
-}
-```
-
-**`map.lock.json` (excerpt):**
-
-```json
-{
-  "schema": 1,
-  "manifest_hash": "sha256:…",
-  "generated_at": "2025-08-14T19:00:00Z",
-  "entity_map": { "climate.living_room_trv": "stable:aa12…" },
-  "service_sig": { "climate.set_temperature": "fields-hash" },
-  "attr_enums": { "climate.hvac_mode": ["OFF","HEAT","AUTO"] }
-}
-```
-
-**Notes**
-
-* `stable_id` derives from HA registry `unique_id` (preferred) or a durable composite; it is invariant across renames.
-* Attribute descriptors carry `kind`, optional `unit`, optional `enum`, and optional `caps` with `{min,max,step}`.
+CLI flags will always override environment variables.
 
 ---
 
-## Generated Outputs
+## The Manifest & Lock File
 
-* `build/generated/proto/`
+* **`manifest.pb`**: A detailed, binary snapshot of your Home Assistant instance. It describes every entity, its attributes (with types, units, and capability ranges), and all available services. This file can change between discoveries.
 
-    * `manifest.proto`, `entities.proto`, `services.proto`, **`attributes.proto`**
-* `build/generated/java/` *(optional MVP)*
+* **`map.lock.pb`**: A reproducible, binary lock file that assigns a **stable ID** to every entity. It also contains checksums for the manifest and service signatures. This file is designed to be checked into version control, allowing you to track changes to your smart home over time.
 
-    * `…/gen/Entities.java` (stable refs per domain)
-    * `…/gen/services/...` (typed service builders)
-    * **`…/gen/Attrs/...`** (typed attribute accessors)
-    * **`…/gen/Capabilities/...`** (per-attribute min/max/step)
-    * **`…/gen/enums/...`** (domain attribute enums, e.g., `ClimateHvacMode`)
+> You can use the `--json` flag with the `discover` command to generate human-readable `.json` versions of these files for inspection (Note: this is currently non-functional, see [#42](https://github.com/PulseAutomate/pulse-map/issues/42)).
 
 ---
 
@@ -290,16 +196,10 @@ CLI flags override environment variables.
 
 ```
 pulse-map/
-├─ app-cli/              # picocli-based CLI; can build as GraalVM native-image
-├─ mapd/                 # long-running daemon (gRPC server)
-├─ ha-client/            # REST+WS to HA; manifest harvest
-├─ manifest/             # model + builder + (de)json
-├─ gen-proto/            # manifest -> .proto files
-├─ gen-jvm/              # manifest -> Java bindings (MVP)
-├─ gen-attrs/            # mapped attributes, capabilities, enums (MVP)
-├─ grpc-api/             # .proto for MapService (daemon API)
-├─ test-fixtures/        # recorded HA payloads + sample manifests
-├─ integration-tests/    # end-to-end tests (discover → proto → java)
+├─ map-cli/              # picocli-based CLI (builds to GraalVM native-image)
+├─ ha-client/            # REST client for Home Assistant
+├─ manifest/             # Data model, builder, and attribute inference logic
+├─ ... other modules
 └─ gradle/               # libs.versions.toml (version catalog)
 ```
 
@@ -307,98 +207,45 @@ pulse-map/
 
 ## Build From Source
 
-**Prereqs**: JDK 21+, Gradle wrapper, optionally GraalVM for native builds.
+**Prerequisites**: JDK 21+ and the Gradle wrapper. For native builds, you'll also need GraalVM.
 
 ```bash
-# JVM build
+# Run tests and build the JAR
 ./gradlew build
 
-# Format (Spotless)
+# Apply code formatting
 ./gradlew spotlessApply
 
-# Native image (CLI)
-./gradlew :app-cli:nativeCompile
-# (Optionally) Native image (daemon) once mapd main class exists
-# ./gradlew :mapd:nativeCompile
+# Build the native executable (e.g., for Linux)
+./gradlew :map-cli:nativeCompile
 ```
-
-### Version Catalog
-
-Dependencies and plugin versions live in `gradle/libs.versions.toml`. Use the Versions plugin to check updates:
-
-```bash
-./gradlew app-cli:dependencyUpdates
-```
-
----
-
-## Development Tips (IntelliJ)
-
-* **Project SDK**: set to JDK **21** (File → Project Structure → Project → SDK).
-* **Plugins**: install *Protobuf* (JetBrains) for `.proto`, optional *GraalVM*.
-* **Gradle settings**: run tests using **Gradle** for consistency with CI.
-* **Run configs**: create Application configs for `io.pulseautomate.map.cli.Main` and later the daemon main.
 
 ---
 
 ## Roadmap
 
-**M1 – Discover & Manifest**
+**M1 – Discover & Analyze (Complete)**
 
-* HA snapshot + WS watch; typed attribute descriptors & capability ranges; lock file; `discover` CLI; golden tests.
+* Stable CLI with `discover`, `validate`, and `stats`.
+* Manifest and lock file generation in Protobuf format.
+* Attribute inference and stable ID creation.
 
-**M2 – Generators**
+**M2 – Code Generation**
 
-* Protobuf (`attributes.proto`) + JVM bindings (Entities/Services/Attrs/Capabilities/Enums); compile-check examples.
+* Introduce `proto` and `java` CLI commands to generate language-specific bindings from the manifest.
+* Generate Protobuf definitions and typed Java classes for entities, services, and attributes.
 
 **M3 – Daemon & gRPC**
 
-* `mapd` with `Watch` stream; suggestion/aggressive modes; Forge handshake; reconnection & coalescing.
-
-**M4 – Hardening & Release**
-
-* Perf tuning; docs; multi-arch native releases; Guard clamp E2E; governance (CONTRIBUTING, SECURITY, templates).
-
----
-
-## Versioning & Compatibility
-
-* **SemVer** for released binaries.
-* **Manifest/Proto compatibility**: additive changes are backwards compatible; field number changes or removals are **breaking** and will bump a major version and be tagged with `breaking-change`.
-* CLI flags follow deprecation → removal with at least **one minor** transition period.
+* Develop `mapd`, a long-running daemon that watches Home Assistant for changes in real-time.
+* Expose a gRPC API for other tools in the PulseAutomate ecosystem to consume.
 
 ---
 
 ## Contributing
 
-We ❤️ contributions! Please:
-
-1. Pick an issue labeled `good first issue` or `help wanted`.
-2. Discuss significant changes before coding.
-3. Use Conventional Commits in PR titles, e.g.
-
-    * `feat(manifest): add capability ranges to climate attributes`
-    * `fix(security): redact HA token in error logs`
-4. Ensure `./gradlew build` and `./gradlew spotlessCheck` pass.
-
-See also: **[CONTRIBUTING.md](./CONTRIBUTING.md)** (coming soon) and the [Label Usage Guide](./CONTRIBUTING.md#label-usage-guide).
-
-## Code of Conduct
-
-This project follows a standard **Code of Conduct**. Be kind and inclusive. (Doc to be added as `CODE_OF_CONDUCT.md`.)
-
-## Security
-
-If you discover a security issue, **do not** open a public issue. Please email the maintainers (see `SECURITY.md`, coming soon) and we’ll coordinate a fix & disclosure.
+We welcome contributions! Please see our `CONTRIBUTING.md` file (coming soon) for more details on our development process and how to get involved. We use and enforce **Conventional Commits**.
 
 ## License
 
-Licensed under **Apache License 2.0** — see [LICENSE](./LICENSE).
-
-## Community & Links
-
-* **Org hub**: [https://github.com/PulseAutomate](https://github.com/PulseAutomate)
-* **Issues**: ../../issues
-* **Milestones**: ../../milestones
-* **Actions**: ../../actions
-* Related repos (coming soon): Pulse Core, Pulse Forge, Pulse Sandbox, Pulse Guard
+Licensed under the **Apache License 2.0** — see the [LICENSE](./LICENSE) file for details.
