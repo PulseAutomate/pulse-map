@@ -2,6 +2,7 @@ plugins {
     id("java-library")
     alias(libs.plugins.spotless)
     alias(libs.plugins.versions) apply false
+    alias(libs.plugins.changelog)
 }
 
 allprojects {
@@ -30,4 +31,12 @@ spotless {
         trimTrailingWhitespace()
         endWithNewline()
     }
+}
+
+changelog {
+    version = project.version.toString()
+    path.set("${project.rootDir}/CHANGELOG.md")
+    header = provider { "[${project.version}]" }
+    keepUnreleasedSection = true
+    unreleasedTerm = "[Unreleased]"
 }

@@ -13,6 +13,7 @@ protobufPlugin = "0.9.4"
 graalvmNative = "0.10.2"
 versionsPlugin = "0.51.0"
 shadow = "8.1.1"
+changelog = "2.2.0"
 
 [libraries]
 # CLI
@@ -39,3 +40,4 @@ protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
 graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvmNative" }
 versions = { id = "com.github.ben-manes.versions", version.ref = "versionsPlugin" }
 shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
+changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }

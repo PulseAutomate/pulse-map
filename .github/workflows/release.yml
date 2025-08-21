@@ -112,6 +112,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # This step reads the version from gradle.properties, removes '-SNAPSHOT', and sets it as an environment variable
       - name: Extract version from gradle.properties
@@ -142,13 +144,18 @@ jobs:
 
       # Upload all the downloaded binaries to the release
       - name: Upload Release Assets
+        # Use bash shell and set nullglob to prevent errors if no files are found
+        shell: bash
         run: |
+          shopt -s nullglob
           # The download-artifact action creates a directory for each artifact.
           # We need to go into each directory to find the binary.
           for dir in dist/*; do
             file_path=$(find "$dir" -type f)
-            echo "Uploading $file_path..."
-            gh release upload v${{ env.VERSION }} "$file_path" --clobber
+            if [ -n "$file_path" ]; then
+              echo "Uploading $file_path..."
+              gh release upload v${{ env.VERSION }} "$file_path" --clobber
+            fi
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
