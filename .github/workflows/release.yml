@@ -130,7 +130,7 @@ jobs:
       - name: Validate Version Consistency
         run: |
           TAG_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
-          PROJECT_VERSION=$(grep 'version=' gradle.properties | cut -d'=' f2)
+          PROJECT_VERSION=$(grep 'version=' gradle.properties | cut -d'=' -f2)
           if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
             echo "Error: Git tag ($TAG_VERSION) does not match project version in gradle.properties ($PROJECT_VERSION)."
             exit 1
