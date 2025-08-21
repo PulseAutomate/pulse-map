@@ -169,12 +169,11 @@ jobs:
 
       - name: Upload Release Assets
         run: |
-          # Rename and upload each artifact for clarity
-          mv dist/pulse-map-linux-amd64/pulse-map dist/pulse-map-linux-amd64
-          mv dist/pulse-map-macos-amd64/pulse-map dist/pulse-map-macos-amd64
-          mv dist/pulse-map-macos-arm64/pulse-map dist/pulse-map-macos-arm64
-          mv dist/pulse-map-windows-amd64.exe/pulse-map.exe dist/pulse-map-windows-amd64.exe
-          
-          gh release upload ${{ github.ref_name }} dist/* --clobber
+          gh release upload ${{ github.ref_name }} \
+            dist/pulse-map-linux-amd64/pulse-map#pulse-map-linux-amd64 \
+            dist/pulse-map-macos-amd64/pulse-map#pulse-map-macos-amd64 \
+            dist/pulse-map-macos-arm64/pulse-map#pulse-map-macos-arm64 \
+            dist/pulse-map-windows-amd64.exe/pulse-map.exe#pulse-map-windows-amd64.exe \
+            --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
