@@ -166,33 +166,56 @@ jobs:
       - name: Build native image
         run: ./gradlew --no-daemon ${{ env.NATIVE_TASK }}
 
-      - name: Locate binary & package
-        id: pkg
+      # --- package (*nix) ---
+      - name: Package artifact (*nix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
-          NAME="${{ env.IMAGE_NAME }}"
-          BIN="${{ env.BIN_DIR }}/${NAME}${{ matrix.exe_ext }}"
+          NAME="${IMAGE_NAME}"
+          LABEL="${{ matrix.label }}"
+          BIN="${BIN_DIR}/${NAME}${{ matrix.exe_ext }}"
           [ -f "${BIN}" ] || { echo "Binary not found at ${BIN}"; ls -R map-cli/build || true; exit 1; }
-          if [[ "${RUNNER_OS}" != "Windows" ]]; then chmod +x "${BIN}"; fi
+          chmod +x "${BIN}"
+          mkdir -p "dist/${NAME}-${TAG}-${LABEL}"
+          cp "${BIN}" "dist/${NAME}-${TAG}-${LABEL}/${NAME}${{ matrix.exe_ext }}"
+          (cd dist && tar -czf "${NAME}-${TAG}-${LABEL}.tar.gz" "${NAME}-${TAG}-${LABEL}")
 
-          mkdir -p "dist/${NAME}-${TAG}-${{ matrix.label }}"
-          cp "${BIN}" "dist/${NAME}-${TAG}-${{ matrix.label }}/${NAME}${{ matrix.exe_ext }}"
-          # Optional: include LICENSE/README
-          # cp LICENSE README.md "dist/${NAME}-${TAG}-${{ matrix.label }}/"
+      # --- package (Windows) ---
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          $Tag  = "${env:GITHUB_REF_NAME}".TrimStart('v','V')
+          $Name = "${env:IMAGE_NAME}"
+          $Bin  = "map-cli/build/native/nativeCompile/$Name.exe"
+          if (-not (Test-Path $Bin)) { Get-ChildItem -Recurse map-cli/build; throw "Binary not found at $Bin" }
+          $Base = "$Name-$Tag-$env:LABEL"
+          New-Item -ItemType Directory -Force -Path "dist/$Base" | Out-Null
+          Copy-Item $Bin "dist/$Base/$Name.exe"
+          Compress-Archive -Path "dist/$Base/*" -DestinationPath "dist/$Base.zip" -Force
 
-          if [[ "${{ matrix.archive }}" == "zip" ]]; then
-            (cd dist && zip -r "${NAME}-${TAG}-${{ matrix.label }}.zip" "${NAME}-${TAG}-${{ matrix.label }}")
-          else
-            (cd dist && tar -czf "${NAME}-${TAG}-${{ matrix.label }}.tar.gz" "${NAME}-${TAG}-${{ matrix.label }}")
-          fi
-
-      - name: Smoke test binary (--version)
+      # --- smoke test (*nix) ---
+      - name: Smoke test binary (--version) (*nix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
-          BIN="dist/${{ env.IMAGE_NAME }}-${TAG}-${{ matrix.label }}/${{ env.IMAGE_NAME }}${{ matrix.exe_ext }}"
-          "${BIN}" --version || { echo "Smoke test failed"; exit 1; }
+          BIN="dist/${IMAGE_NAME}-${TAG}-${{ matrix.label }}/${IMAGE_NAME}${{ matrix.exe_ext }}"
+          "${BIN}" --version
+
+      # --- smoke test (Windows) ---
+      - name: Smoke test binary (--version) (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          $Tag  = "${env:GITHUB_REF_NAME}".TrimStart('v','V')
+          $Name = "${env:IMAGE_NAME}"
+          & "dist/$Name-$Tag-$env:LABEL/$Name.exe" --version
 
       - name: Create SBOM (CycloneDX)
         run: ./gradlew --no-daemon cyclonedxBomAll || true
