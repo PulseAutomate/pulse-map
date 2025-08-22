@@ -18,7 +18,7 @@ env:
 
 jobs:
   guard-main:
-    name: Guard: main + tag sanity
+    name: Guard - main + tag sanity
     runs-on: ubuntu-latest
     outputs:
       is_prerelease: ${{ steps.vercheck.outputs.is_prerelease }}
