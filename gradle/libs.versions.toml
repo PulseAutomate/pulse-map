@@ -14,6 +14,7 @@ graalvmNative = "0.10.2"
 versionsPlugin = "0.51.0"
 shadow = "8.1.1"
 changelog = "2.2.0"
+cyclonedx = "1.9.0"
 
 [libraries]
 # CLI
@@ -41,3 +42,4 @@ graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvmN
 versions = { id = "com.github.ben-manes.versions", version.ref = "versionsPlugin" }
 shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
