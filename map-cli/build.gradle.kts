@@ -56,9 +56,12 @@ graalvmNative {
             buildArgs.set(
                 listOf(
                     "--no-fallback",
-                    "--install-exit-handlers"
+                    "--install-exit-handlers",
+                    "-H:+ReportExceptionStackTraces"
                 )
             )
+
+            resources.autodetect()
         }
     }
 }
