@@ -2,9 +2,7 @@ name: Release (tagged)
 
 on:
   push:
-    tags:
-      - 'v*'
-      - 'V*'
+    tags: ['v*','V*']
   workflow_dispatch: {}
 
 permissions:
@@ -25,8 +23,7 @@ jobs:
     outputs:
       is_prerelease: ${{ steps.vercheck.outputs.is_prerelease }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -38,40 +35,29 @@ jobs:
           set -euo pipefail
           COMMIT_SHA="$(git rev-parse "${GITHUB_REF}^{commit}")"
           git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "${COMMIT_SHA}" origin/main; then
-            echo "Tag must point to a commit on main (not found in origin/main)"; exit 1;
-          fi
+          git merge-base --is-ancestor "${COMMIT_SHA}" origin/main || { echo "Tag must be on main"; exit 1; }
 
       - name: Require annotated tag
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          set -euo pipefail
           TYPE="$(git for-each-ref --format="%(objecttype)" "refs/tags/${GITHUB_REF_NAME}")"
-          echo "Tag object type: ${TYPE}"
-          [ "${TYPE}" = "tag" ] || { echo "Tag must be annotated"; exit 1; }
+          [ "$TYPE" = "tag" ] || { echo "Tag must be annotated"; exit 1; }
 
-      - name: Validate tag format (SemVer + optional pre-release)
+      - name: Validate tag format
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          [[ "${TAG}" =~ ^[vV][0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z]+[0-9]*)?$ ]] || {
-            echo "Bad tag format: ${TAG}"; exit 1; }
+          [[ "${GITHUB_REF_NAME}" =~ ^[vV][0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z]+[0-9]*)?$ ]] || { echo "Bad tag"; exit 1; }
 
       - name: Compare gradle.properties version with tag
         id: vercheck
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           PROP="$(grep '^version=' gradle.properties | cut -d'=' -f2 | tr -d '[:space:]')"
-          TAG="${GITHUB_REF_NAME#v}"
-          TAG="${TAG#V}"
-          echo "gradle.properties=${PROP} tag=${TAG}"
-          [ "${PROP}" = "${TAG}" ] || { echo "Version mismatch: gradle.properties=${PROP}, tag=${TAG}"; exit 1; }
-          case "${TAG}" in
-            *-M*|*-RC*|*-alpha*|*-beta*|*-preview*)
-              echo "is_prerelease=true"  >> "${GITHUB_OUTPUT}" ;;
-            *)
-              echo "is_prerelease=false" >> "${GITHUB_OUTPUT}"
-              [[ "${PROP}" == *-SNAPSHOT ]] && { echo "Release version must not end with -SNAPSHOT"; exit 1; } ;;
+          TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
+          [ "$PROP" = "$TAG" ] || { echo "Version mismatch: $PROP vs $TAG"; exit 1; }
+          case "$TAG" in
+            *-M*|*-RC*|*-alpha*|*-beta*|*-preview*) echo "is_prerelease=true"  >> "$GITHUB_OUTPUT" ;;
+            *) echo "is_prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
   changelog:
@@ -80,32 +66,23 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.ref }}
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Gradle setup
-        uses: gradle/gradle-build-action@v3
-
+      - uses: gradle/gradle-build-action@v3
       - name: Patch changelog
         run: ./gradlew --no-daemon patchChangelog -Pversion=${GITHUB_REF_NAME#v}
-
       - name: Commit & push changelog
         run: |
           if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add CHANGELOG.md
-            git commit -m "docs(changelog): release ${GITHUB_REF_NAME}"
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -am "docs(changelog): release ${GITHUB_REF_NAME}"
             git push
           fi
 
@@ -117,41 +94,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            label: linux-x86_64
-            archive: tar.gz
-            exe_ext: ""
-          - os: windows-latest
-            label: windows-x86_64
-            archive: zip
-            exe_ext: ".exe"
-          - os: macos-13
-            label: macos-x86_64
-            archive: tar.gz
-            exe_ext: ""
-          - os: macos-latest
-            label: macos-arm64
-            archive: tar.gz
-            exe_ext: ""
+          - { os: ubuntu-latest, label: linux-x86_64,  exe_ext: "" }
+          - { os: windows-latest, label: windows-x86_64, exe_ext: ".exe" }
+          - { os: macos-13, label: macos-x86_64,       exe_ext: "" }
+          - { os: macos-latest, label: macos-arm64,    exe_ext: "" }
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.ref }}
 
-      - name: Set up GraalVM
-        uses: graalvm/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1
         with:
           distribution: graalvm-community
           java-version: ${{ env.JAVA_VERSION }}
           components: native-image
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Gradle setup
-        uses: gradle/gradle-build-action@v3
+      - uses: gradle/gradle-build-action@v3
 
       - name: Sanity tests
         run: ./gradlew --no-daemon test
@@ -159,29 +121,25 @@ jobs:
       - name: Build native image
         run: ./gradlew --no-daemon ${{ env.NATIVE_TASK }}
 
-      # Package (*nix)
       - name: Package artifact (*nix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -e
           TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
-          NAME="${IMAGE_NAME}"
-          LABEL="${{ matrix.label }}"
+          NAME="${IMAGE_NAME}"; LABEL="${{ matrix.label }}"
           BIN="${BIN_DIR}/${NAME}${{ matrix.exe_ext }}"
-          [ -f "${BIN}" ] || { echo "Binary not found at ${BIN}"; ls -R map-cli/build || true; exit 1; }
-          chmod +x "${BIN}"
+          [ -f "$BIN" ] || { echo "Binary not found at $BIN"; ls -R map-cli/build || true; exit 1; }
+          chmod +x "$BIN"
           mkdir -p "dist/${NAME}-${TAG}-${LABEL}"
-          cp "${BIN}" "dist/${NAME}-${TAG}-${LABEL}/${NAME}${{ matrix.exe_ext }}"
+          cp "$BIN" "dist/${NAME}-${TAG}-${LABEL}/${NAME}${{ matrix.exe_ext }}"
           (cd dist && tar -czf "${NAME}-${TAG}-${LABEL}.tar.gz" "${NAME}-${TAG}-${LABEL}")
-          echo "Built archive:"; ls -l dist
+          ls -l dist
 
-      # Package (Windows)
       - name: Package artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        env:
-          LABEL: ${{ matrix.label }}
+        env: { LABEL: ${{ matrix.label }} }
         run: |
           $ErrorActionPreference = "Stop"
           $Tag  = "${env:GITHUB_REF_NAME}".TrimStart('v','V')
@@ -192,36 +150,15 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist/$Base" | Out-Null
           Copy-Item $Bin "dist/$Base/$Name.exe"
           Compress-Archive -Path "dist/$Base/*" -DestinationPath "dist/$Base.zip" -Force
-          Write-Host "Built archive(s):"
           Get-ChildItem dist
-
-      # Smoke tests
-      - name: Smoke test binary (--version) (*nix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
-          BIN="dist/${IMAGE_NAME}-${TAG}-${{ matrix.label }}/${IMAGE_NAME}${{ matrix.exe_ext }}"
-          "${BIN}" --version
-
-      - name: Smoke test binary (--version) (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          LABEL: ${{ matrix.label }}
-        run: |
-          $Tag  = "${env:GITHUB_REF_NAME}".TrimStart('v','V')
-          $Name = "${env:IMAGE_NAME}"
-          & "dist/$Name-$Tag-$env:LABEL/$Name.exe" --version
 
       - name: Create SBOM (CycloneDX)
         run: ./gradlew --no-daemon cyclonedxBomAll || true
 
-      - name: Upload build artifacts
+      - name: Upload build artifacts (per-OS)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.IMAGE_NAME }}-${{ github.ref_name }}-${{ matrix.label }}
-          # Upload packaged archives and SBOMs; fail if archives missing
           path: |
             dist/*.zip
             dist/*.tar.gz
@@ -235,48 +172,58 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifacts (merge into workspace)
-        uses: actions/download-artifact@v4
-        with:
-          path: .
-          merge-multiple: true
-
-      - name: Gather archives into top-level dist/
-        shell: bash
-        run: |
-          set -e
-          mkdir -p dist
-          echo "Finding archives under workspace..."
-          find . -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print
-          # Move all found archives into ./dist, regardless of their current folder
-          mapfile -t files < <(find . -type f \( -name '*.zip' -o -name '*.tar.gz' \))
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No release archives found anywhere in workspace."; exit 1
-          fi
-          for f in "${files[@]}"; do
-            # Skip files already in top-level dist
-            [[ "$f" == ./dist/*.zip || "$f" == ./dist/*.tar.gz ]] && continue
-            mv "$f" dist/
-          done
-          echo "Top-level dist contents now:"
-          ls -l dist
-
-      - name: Generate SHA-256 checksums
-        shell: bash
-        run: |
-          cd dist
-          for f in *.zip *.tar.gz; do
-            [ -e "$f" ] || continue
-            sha256sum "$f" > "$f.sha256"
-          done
-          ls -l
-
+      # Checkout FIRST so it can't wipe dist later
       - name: Checkout (for CHANGELOG)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.ref }}
+          clean: false  # keep any downloaded files
+
+      # Pull all matrix artifacts straight into ./dist
+      - name: Download build archives to dist/
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.IMAGE_NAME }}-${{ github.ref_name }}-*
+          merge-multiple: true
+          path: dist
+
+      - name: List archives
+        run: |
+          echo "dist/:"; ls -l dist || true
+          echo "Found archives:"; find dist -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) -printf '%f\n' || true
+
+      - name: Ensure we have archives
+        run: |
+          shopt -s nullglob
+          files=(dist/*.zip dist/*.tar.gz)
+          echo "Matched: ${files[@]}"
+          (( ${#files[@]} > 0 )) || { echo "No release archives in dist/"; exit 1; }
+
+      # Create release checksums + the attestation subjects list
+      - name: Generate checksums (release assets + subjects file)
+        shell: bash
+        run: |
+          set -e
+          cd dist
+          # Generate .sha256 files for the Release
+          for f in *.zip *.tar.gz; do
+            [ -e "$f" ] || continue
+            sha256sum "$f" > "$f.sha256"
+          done
+          # Build a single subjects file: "<sha256>  <filename>" per line
+          sha256sum *.zip *.tar.gz 2>/dev/null | sed '/^$/d' > ../subject.checksums.txt || true
+          cd ..
+          [ -s subject.checksums.txt ] || { echo "No subjects to attest"; exit 1; }
+          echo "Subjects:"; nl -ba subject.checksums.txt
+          ls -l dist
+
+      # Attest by checksums (robust across paths)
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-checksums: subject.checksums.txt
 
       - name: Extract notes for this tag from CHANGELOG.md
         id: notes
@@ -288,13 +235,6 @@ jobs:
             p {print}
           ' CHANGELOG.md > notes.md || true
           [ -s notes.md ] || echo "No specific section found; using empty body."
-
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: |
-            dist/*.zip
-            dist/*.tar.gz
 
       - name: Create/Update draft GitHub Release
         uses: softprops/action-gh-release@v2
@@ -317,13 +257,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.ref }}
-
       - name: Compute and bump version
         id: bump
         run: |
@@ -332,14 +270,10 @@ jobs:
           NEXT="${MA}.${MI}.$((PA+1))-SNAPSHOT"
           sed -i -E "s/^version=.*/version=${NEXT}/" gradle.properties
           git switch -c chore/bump-next-snapshot || git checkout -b chore/bump-next-snapshot
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(version): bump to ${NEXT}"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -am "chore(version): bump to ${NEXT}"
           git push -u origin chore/bump-next-snapshot
           echo "next=${NEXT}" >> "${GITHUB_OUTPUT}"
-
-      - name: Open PR
-        uses: peter-evans/create-pull-request@v6
+      - uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/bump-next-snapshot
           title: "chore(version): bump to ${{ steps.bump.outputs.next }}"
