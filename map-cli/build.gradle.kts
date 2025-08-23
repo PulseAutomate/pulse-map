@@ -63,6 +63,7 @@ graalvmNative {
             )
 
             resources.autodetect()
+            resources.includedPatterns.add("io/pulseautomate/map/gen/proto/templates/.*\\.template")
         }
     }
 }

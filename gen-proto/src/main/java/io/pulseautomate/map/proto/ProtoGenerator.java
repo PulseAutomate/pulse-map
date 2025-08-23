@@ -111,7 +111,7 @@ public final class ProtoGenerator {
   }
 
   private String readTemplate(String name) throws IOException {
-    var path = "templates/" + name;
+    var path = "io/pulseautomate/map/proto/templates/" + name;
     try (InputStream in = getClass().getClassLoader().getResourceAsStream(path)) {
       if (in == null) throw new IOException("Template not found: " + path);
       return new String(in.readAllBytes(), StandardCharsets.UTF_8);
