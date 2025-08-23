@@ -1,0 +1,39 @@
+# .github/release.yml
+changelog:
+  exclude:
+    labels:
+      - ignore
+      - wontfix
+    authors:
+      - dependabot
+  categories:
+    - title: 🚨 Breaking Changes
+      labels:
+        - breaking-change
+        - Semver-Major
+    - title: ✨ Features
+      labels:
+        - type/feature
+        - type:feature
+        - enhancement
+        - Semver-Minor
+    - title: 🐛 Fixes
+      labels:
+        - type/bug
+        - type:bug
+        - bug
+        - fix
+    - title: 🧰 Maintenance
+      labels:
+        - type/chore
+        - type:chore
+        - chore
+        - refactor
+        - docs
+        - ci
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+    - title: Other Changes
+      labels:
+        - '*'

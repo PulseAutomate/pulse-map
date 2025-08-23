@@ -60,32 +60,6 @@ jobs:
             *) echo "is_prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
-  changelog:
-    name: Patch CHANGELOG.md
-    needs: guard-main
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-          ref: ${{ github.ref }}
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-      - uses: gradle/actions/setup-gradle@v3
-      - name: Patch changelog
-        run: ./gradlew --no-daemon patchChangelog -Pversion=${GITHUB_REF_NAME#v}
-      - name: Commit & push changelog
-        run: |
-          if ! git diff --quiet; then
-            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -am "docs(changelog): release ${GITHUB_REF_NAME}"
-            git push
-          fi
-
   build:
     name: Native build (${{ matrix.os }} / ${{ matrix.label }})
     needs: guard-main
@@ -168,7 +142,7 @@ jobs:
 
   draft-release:
     name: Draft release + checksums + provenance
-    needs: [guard-main, changelog, build]
+    needs: [guard-main, build]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -224,17 +198,6 @@ jobs:
         with:
           subject-checksums: subject.checksums.txt
 
-      - name: Extract notes for this tag from CHANGELOG.md
-        id: notes
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
-          awk -v tag="${TAG}" '
-            $0 ~ "^## \\["tag"\\]" {p=1; next}
-            p && $0 ~ "^## \\[" {p=0}
-            p {print}
-          ' CHANGELOG.md > notes.md || true
-          [ -s notes.md ] || echo "No specific section found; using empty body."
-
       - name: Create/Update draft GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -242,7 +205,7 @@ jobs:
           prerelease: ${{ needs.guard-main.outputs.is_prerelease }}
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          body_path: notes.md
+          generate_release_notes: true
           files: |
             dist/**/*.zip
             dist/**/*.tar.gz
