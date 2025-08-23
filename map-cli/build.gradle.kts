@@ -18,6 +18,7 @@ dependencies {
     // Core module dependencies
     implementation(project(":ha-client"))
     implementation(project(":manifest"))
+    implementation(project(":gen-proto"))
 
     // CLI argument parsing
     implementation(libs.picocli)
@@ -62,6 +63,7 @@ graalvmNative {
             )
 
             resources.autodetect()
+            resources.includedPatterns.add("io/pulseautomate/map/gen/proto/templates/.*\\.template")
         }
     }
 }

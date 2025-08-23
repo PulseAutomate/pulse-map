@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package pulse.v1;
+
+option java_package = "io.pulseautomate.api.services";
+option java_multiple_files = true;
