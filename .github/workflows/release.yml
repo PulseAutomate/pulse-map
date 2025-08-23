@@ -242,11 +242,27 @@ jobs:
         with:
           path: ./dist
 
+      - name: Flatten downloaded artifacts
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          mkdir -p dist/flat
+          for f in dist/**/*.zip dist/**/*.tar.gz; do
+            [ -e "$f" ] || continue
+            mv "$f" dist/
+          done
+          echo "Top-level dist contents:"
+          ls -l dist || true
+
       - name: Generate SHA-256 checksums
+        shell: bash
         run: |
           cd dist
-          find . -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print0 | \
-            xargs -0 -I {} sh -c 'sha256sum "{}" > "{}.sha256"'
+          for f in *.zip *.tar.gz; do
+            [ -e "$f" ] || continue
+            sha256sum "$f" > "$f.sha256"
+          done
+          ls -l
 
       - name: Checkout (for CHANGELOG)
         uses: actions/checkout@v4
@@ -270,8 +286,8 @@ jobs:
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: |
-            dist/**/*.zip
-            dist/**/*.tar.gz
+            dist/*.zip
+            dist/*.tar.gz
 
       - name: Create/Update draft GitHub Release
         uses: softprops/action-gh-release@v2
@@ -282,9 +298,9 @@ jobs:
           tag_name: ${{ github.ref_name }}
           body_path: notes.md
           files: |
-            dist/**/*.zip
-            dist/**/*.tar.gz
-            dist/**/*.sha256
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
