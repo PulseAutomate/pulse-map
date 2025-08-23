@@ -75,7 +75,7 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - uses: gradle/gradle-build-action@v3
+      - uses: gradle/actions/setup-gradle@v3
       - name: Patch changelog
         run: ./gradlew --no-daemon patchChangelog -Pversion=${GITHUB_REF_NAME#v}
       - name: Commit & push changelog
@@ -113,7 +113,7 @@ jobs:
           components: native-image
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: gradle/gradle-build-action@v3
+      - uses: gradle/actions/setup-gradle@v3
 
       - name: Sanity tests
         run: ./gradlew --no-daemon test
@@ -138,8 +138,8 @@ jobs:
 
       - name: Package artifact (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
-        env: { LABEL: ${{ matrix.label }} }
+        env:
+          LABEL: ${{ matrix.label }}
         run: |
           $ErrorActionPreference = "Stop"
           $Tag  = "${env:GITHUB_REF_NAME}".TrimStart('v','V')
@@ -185,7 +185,7 @@ jobs:
       - name: Download build archives to dist/
         uses: actions/download-artifact@v4
         with:
-          pattern: ${{ env.IMAGE_NAME }}-${{ github.ref_name }}-*
+          pattern: "${{ env.IMAGE_NAME }}-${{ github.ref_name }}-*"
           merge-multiple: true
           path: dist
 
