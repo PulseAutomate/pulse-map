@@ -191,33 +191,32 @@ jobs:
 
       - name: List archives
         run: |
-          echo "dist/:"; ls -l dist || true
-          echo "Found archives:"; find dist -maxdepth 1 -type f \( -name '*.zip' -o -name '*.tar.gz' \) -printf '%f\n' || true
+          echo "Tree under dist/:"
+          find dist -type f -printf '%p\n' || true
+          echo "Found archives:"
+          find dist -type f \( -name '*.zip' -o -name '*.tar.gz' \) -printf '%p\n' || true
 
       - name: Ensure we have archives
         run: |
           shopt -s nullglob
-          files=(dist/*.zip dist/*.tar.gz)
-          echo "Matched: ${files[@]}"
-          (( ${#files[@]} > 0 )) || { echo "No release archives in dist/"; exit 1; }
+          mapfile -t files < <(find dist -type f \( -name '*.zip' -o -name '*.tar.gz' \))
+          echo "Matched: ${#files[@]} files"
+          ((${#files[@]} > 0)) || { echo "No release archives under dist/"; exit 1; }
 
       # Create release checksums + the attestation subjects list
       - name: Generate checksums (release assets + subjects file)
         shell: bash
         run: |
-          set -e
-          cd dist
-          # Generate .sha256 files for the Release
-          for f in *.zip *.tar.gz; do
-            [ -e "$f" ] || continue
+          set -euo pipefail
+          # create checksum files alongside each archive
+          while IFS= read -r -d '' f; do
             sha256sum "$f" > "$f.sha256"
-          done
-          # Build a single subjects file: "<sha256>  <filename>" per line
-          sha256sum *.zip *.tar.gz 2>/dev/null | sed '/^$/d' > ../subject.checksums.txt || true
-          cd ..
+          done < <(find dist -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print0)
+          # subjects file for attest-build-provenance: "<sha256>  <filename>" (shasum format)
+          find dist -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print0 \
+            | xargs -0 sha256sum > subject.checksums.txt
           [ -s subject.checksums.txt ] || { echo "No subjects to attest"; exit 1; }
-          echo "Subjects:"; nl -ba subject.checksums.txt
-          ls -l dist
+          nl -ba subject.checksums.txt
 
       # Attest by checksums (robust across paths)
       - name: Attest build provenance
@@ -245,36 +244,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           body_path: notes.md
           files: |
-            dist/*.zip
-            dist/*.tar.gz
-            dist/*.sha256
+            dist/**/*.zip
+            dist/**/*.tar.gz
+            dist/**/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  next-dev:
-    name: Bump to next -SNAPSHOT via PR
-    needs: draft-release
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-          ref: ${{ github.ref }}
-      - name: Compute and bump version
-        id: bump
-        run: |
-          CUR="$(grep '^version=' gradle.properties | cut -d'=' -f2 | tr -d '[:space:]')"
-          IFS='.-' read MA MI PA REST <<<"${CUR}"
-          NEXT="${MA}.${MI}.$((PA+1))-SNAPSHOT"
-          sed -i -E "s/^version=.*/version=${NEXT}/" gradle.properties
-          git switch -c chore/bump-next-snapshot || git checkout -b chore/bump-next-snapshot
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -am "chore(version): bump to ${NEXT}"
-          git push -u origin chore/bump-next-snapshot
-          echo "next=${NEXT}" >> "${GITHUB_OUTPUT}"
-      - uses: peter-evans/create-pull-request@v6
-        with:
-          branch: chore/bump-next-snapshot
-          title: "chore(version): bump to ${{ steps.bump.outputs.next }}"
-          body: "Auto bump to next development iteration after `${{ github.ref_name }}`"
