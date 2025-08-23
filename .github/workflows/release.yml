@@ -4,8 +4,8 @@ on:
   push:
     tags:
       - 'v*'
-      - 'V*'      # allow uppercase V too
-  workflow_dispatch: {}  # manual trigger for sanity checks
+      - 'V*'
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -15,8 +15,8 @@ permissions:
 env:
   JAVA_VERSION: '21'
   NATIVE_TASK: ':map-cli:nativeCompile'
-  BIN_DIR: 'map-cli/build/native/nativeCompile'  # graalvm buildtools default output
-  IMAGE_NAME: 'pulse-map'                        # matches graal imageName
+  BIN_DIR: 'map-cli/build/native/nativeCompile'
+  IMAGE_NAME: 'pulse-map'
 
 jobs:
   guard-main:
@@ -32,18 +32,12 @@ jobs:
           fetch-tags: true
           ref: ${{ github.ref }}
 
-      # Only runs on real tag pushes
       - name: Ensure tag commit is on main
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
-          # Resolve annotated/lightweight tag to commit SHA
           COMMIT_SHA="$(git rev-parse "${GITHUB_REF}^{commit}")"
-          echo "Tag: ${GITHUB_REF}"
-          echo "Commit pointed to by tag: ${COMMIT_SHA}"
-          # Ensure we have origin/main locally
           git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          # Verify the tag's commit is contained in origin/main
           if ! git merge-base --is-ancestor "${COMMIT_SHA}" origin/main; then
             echo "Tag must point to a commit on main (not found in origin/main)"; exit 1;
           fi
@@ -70,8 +64,7 @@ jobs:
           PROP="$(grep '^version=' gradle.properties | cut -d'=' -f2 | tr -d '[:space:]')"
           TAG="${GITHUB_REF_NAME#v}"
           TAG="${TAG#V}"
-          echo "gradle.properties version: ${PROP}"
-          echo "Tag version: ${TAG}"
+          echo "gradle.properties=${PROP} tag=${TAG}"
           [ "${PROP}" = "${TAG}" ] || { echo "Version mismatch: gradle.properties=${PROP}, tag=${TAG}"; exit 1; }
           case "${TAG}" in
             *-M*|*-RC*|*-alpha*|*-beta*|*-preview*)
@@ -166,11 +159,12 @@ jobs:
       - name: Build native image
         run: ./gradlew --no-daemon ${{ env.NATIVE_TASK }}
 
-      # --- package (*nix) ---
+      # Package (*nix)
       - name: Package artifact (*nix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
+          set -e
           TAG="${GITHUB_REF_NAME#v}"; TAG="${TAG#V}"
           NAME="${IMAGE_NAME}"
           LABEL="${{ matrix.label }}"
@@ -180,14 +174,16 @@ jobs:
           mkdir -p "dist/${NAME}-${TAG}-${LABEL}"
           cp "${BIN}" "dist/${NAME}-${TAG}-${LABEL}/${NAME}${{ matrix.exe_ext }}"
           (cd dist && tar -czf "${NAME}-${TAG}-${LABEL}.tar.gz" "${NAME}-${TAG}-${LABEL}")
+          echo "Built archive:"; ls -l dist
 
-      # --- package (Windows) ---
+      # Package (Windows)
       - name: Package artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           LABEL: ${{ matrix.label }}
         run: |
+          $ErrorActionPreference = "Stop"
           $Tag  = "${env:GITHUB_REF_NAME}".TrimStart('v','V')
           $Name = "${env:IMAGE_NAME}"
           $Bin  = "map-cli/build/native/nativeCompile/$Name.exe"
@@ -196,8 +192,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist/$Base" | Out-Null
           Copy-Item $Bin "dist/$Base/$Name.exe"
           Compress-Archive -Path "dist/$Base/*" -DestinationPath "dist/$Base.zip" -Force
+          Write-Host "Built archive(s):"
+          Get-ChildItem dist
 
-      # --- smoke test (*nix) ---
+      # Smoke tests
       - name: Smoke test binary (--version) (*nix)
         if: runner.os != 'Windows'
         shell: bash
@@ -206,7 +204,6 @@ jobs:
           BIN="dist/${IMAGE_NAME}-${TAG}-${{ matrix.label }}/${IMAGE_NAME}${{ matrix.exe_ext }}"
           "${BIN}" --version
 
-      # --- smoke test (Windows) ---
       - name: Smoke test binary (--version) (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -224,12 +221,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.IMAGE_NAME }}-${{ github.ref_name }}-${{ matrix.label }}
+          # Upload packaged archives and SBOMs; fail if archives missing
           path: |
             dist/*.zip
             dist/*.tar.gz
             **/build/reports/bom*.json
             **/build/reports/bom*.xml
-          if-no-files-found: warn
+          if-no-files-found: error
 
   draft-release:
     name: Draft release + checksums + provenance
@@ -237,33 +235,31 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifacts (merge to dist/)
+      - name: Download artifacts (merge into workspace)
         uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: .
           merge-multiple: true
 
-      - name: Flatten archives into top-level dist/
+      - name: Gather archives into top-level dist/
         shell: bash
         run: |
           set -e
-          shopt -s globstar nullglob
-          # Move packaged archives up to dist/ regardless of nesting (dist/dist/..., <artifact>/dist/..., etc.)
-          for f in dist/**/*.zip dist/**/*.tar.gz; do
-            # Skip if already at top-level
-            [[ "$f" == dist/*.zip || "$f" == dist/*.tar.gz ]] && continue
+          mkdir -p dist
+          echo "Finding archives under workspace..."
+          find . -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print
+          # Move all found archives into ./dist, regardless of their current folder
+          mapfile -t files < <(find . -type f \( -name '*.zip' -o -name '*.tar.gz' \))
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release archives found anywhere in workspace."; exit 1
+          fi
+          for f in "${files[@]}"; do
+            # Skip files already in top-level dist
+            [[ "$f" == ./dist/*.zip || "$f" == ./dist/*.tar.gz ]] && continue
             mv "$f" dist/
           done
-          echo "Top-level dist after flatten:"
-          ls -l dist || true
-
-      - name: Verify archives exist
-        shell: bash
-        run: |
-          shopt -s nullglob
-          files=(dist/*.zip dist/*.tar.gz)
-          echo "Matched assets: ${files[@]}"
-          (( ${#files[@]} > 0 )) || { echo "No release archives found in top-level dist/"; exit 1; }
+          echo "Top-level dist contents now:"
+          ls -l dist
 
       - name: Generate SHA-256 checksums
         shell: bash
