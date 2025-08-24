@@ -1,6 +1,8 @@
 name: PR CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [opened, edited, synchronize, reopened, ready_for_review]
     branches: [main]
