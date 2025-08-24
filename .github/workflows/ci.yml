@@ -42,6 +42,7 @@ jobs:
   commits-conventional:
     name: Commits follow Conventional Commits
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -54,6 +55,7 @@ jobs:
     name: Format, Test, Coverage
     runs-on: ubuntu-latest
     needs: [pr-title-conventional, commits-conventional]
+    if: always() && (needs.pr-title-conventional.result != 'failure' && needs.commits-conventional.result != 'failure')
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
